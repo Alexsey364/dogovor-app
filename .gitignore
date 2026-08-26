@@ -1,0 +1,70 @@
+# ============================================================
+#  НИКОГДА НЕ ПОПАДАЕТ В РЕПОЗИТОРИЙ
+#  Здесь коммерческая тайна: договоры, контрагенты, суммы.
+#  Отдельно: контракт с Минобороны по 44-ФЗ.
+# ============================================================
+
+# Реальные документы и всё, что из них извлечено
+private/
+data/
+dogovory/
+uploads/
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.pdf
+*.sig
+*.jpg
+*.jpeg
+*.png
+!docs/screenshots/*.png
+
+# Макеты и выгрузки с реальными данными
+*Договорной контур*.html
+*_real*.html
+parsed*.json
+txt/
+txt2/
+txt3/
+scans/
+
+# Секреты
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.pfx
+id_*
+secrets.*
+config.local.*
+appsettings.Development.json
+
+# База данных
+*.db
+*.sqlite
+*.sqlite3
+*.mdf
+*.ldf
+backups/
+dumps/
+
+# Зависимости и сборка
+node_modules/
+dist/
+build/
+bin/
+obj/
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Служебное
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log
+.vscode/
+.idea/
