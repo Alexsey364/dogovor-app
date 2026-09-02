@@ -168,11 +168,7 @@ CREATE TABLE contracts (
 
     warranty_months   int,
     commissioning_date date,                 -- дата ввода в эксплуатацию
-    warranty_until    date GENERATED ALWAYS AS (
-        CASE WHEN commissioning_date IS NOT NULL AND warranty_months IS NOT NULL
-             THEN (commissioning_date + (warranty_months || ' months')::interval)::date
-        END
-    ) STORED,
+    warranty_until    date,                  -- считается триггером ниже из даты ввода
 
     has_penalty       boolean,               -- есть ли неустойка за просрочку оплаты
     auto_renewal      boolean NOT NULL DEFAULT false,
@@ -201,6 +197,24 @@ CREATE INDEX contracts_counterparty_idx ON contracts(counterparty_id);
 CREATE INDEX contracts_signed_idx       ON contracts(signed_on);
 CREATE INDEX contracts_warranty_idx     ON contracts(warranty_until)
     WHERE warranty_until IS NOT NULL;
+
+-- Конец гарантии считается от даты ввода в эксплуатацию, а не от даты договора.
+-- Триггер вместо генерируемого столбца: date + interval PostgreSQL не признаёт
+-- immutable, а тут та же логика работает надёжно на любой версии.
+CREATE OR REPLACE FUNCTION contracts_set_warranty() RETURNS trigger AS $$
+BEGIN
+    IF NEW.commissioning_date IS NOT NULL AND NEW.warranty_months IS NOT NULL THEN
+        NEW.warranty_until := (NEW.commissioning_date
+                               + make_interval(months => NEW.warranty_months))::date;
+    ELSE
+        NEW.warranty_until := NULL;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER contracts_warranty BEFORE INSERT OR UPDATE ON contracts
+    FOR EACH ROW EXECUTE FUNCTION contracts_set_warranty();
 
 ALTER TABLE contract_numbers
     ADD CONSTRAINT contract_numbers_contract_fk
