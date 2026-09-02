@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block crumb %}Реестр договоров{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h">
+    <h2>{{ rows|length }} договоров</h2>
+    <div class="filters">
+      {% set fl = [('all','Все'),('active','В работе'),('findings','С замечаниями'),('warranty','На гарантии'),('cancelled','Аннулированные')] %}
+      {% for code, label in fl %}
+        <a class="chip {{ 'on' if flt==code }}" href="{{ url_for('registry', f=code) }}">{{ label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Номер</th><th>Дата</th><th>Заказчик</th><th>Объект</th><th>Сумма</th><th>Аванс</th><th>Гар.</th><th>Замеч.</th><th>Стадия</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr onclick="location='{{ url_for('contract', cid=r.id) }}'">
+        <td class="mono">{{ r.number_text }}</td>
+        <td class="mono">{{ r.signed_on|dt('%d.%m.%y') }}</td>
+        <td>{{ r.counterparty or '—' }}</td>
+        <td class="muted">{{ (r.object or '—')|truncate(30) }}</td>
+        <td class="mono">{{ r.amount|money }}</td>
+        <td class="mono">{{ (r.advance_pct|round|int|string ~ '%') if r.advance_pct else '—' }}</td>
+        <td class="mono">{{ r.warranty_months or '—' }}</td>
+        <td>{% if r.findings %}<span class="pill crit">{{ r.findings }}</span>{% else %}<span class="pill ok">чисто</span>{% endif %}</td>
+        <td><span class="pill stage-{{ r.stage }}">{{ STAGE_RU[r.stage] }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

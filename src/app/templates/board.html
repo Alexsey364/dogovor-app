@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block crumb %}Доска стадий{% endblock %}
+{% block body %}
+<div class="board">
+  {% for s in stage_order %}
+  <div class="col">
+    <div class="col-h"><span class="t">{{ STAGE_RU[s] }}</span><span class="c">{{ cols[s]|length }}</span></div>
+    {% for r in cols[s] %}
+    <a class="tk stage-{{ s }}" href="{{ url_for('contract', cid=r.id) }}">
+      <span class="num">{{ r.number_text }}</span>
+      <span class="ttl">{{ r.counterparty or '—' }}</span>
+      <span class="meta">
+        <span class="mono">{{ r.amount|money }}</span>
+        {% if r.crit %}<span class="pill crit">{{ r.crit }}</span>{% endif %}
+      </span>
+    </a>
+    {% else %}
+    <div class="col-empty">пусто</div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

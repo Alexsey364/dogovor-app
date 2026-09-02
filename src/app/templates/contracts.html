@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="stats">
+  <div class="stat"><div class="v">{{ stats.total or 0 }}</div><div class="l">договоров всего</div></div>
+  <div class="stat"><div class="v">{{ stats.active or 0 }}</div><div class="l">в работе и действующих</div></div>
+  <div class="stat"><div class="v">{{ stats.cancelled or 0 }}</div><div class="l">аннулировано</div></div>
+  <div class="stat"><div class="v mono">{{ '{:,.0f}'.format(stats.total_amount or 0).replace(',', ' ') }} ₽</div><div class="l">на сумму</div></div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Реестр договоров</h2></div>
+  {% if rows %}
+  <div class="tablewrap"><table>
+    <thead><tr><th>Номер</th><th>Дата</th><th>Заказчик</th><th>Предмет</th><th>Сумма</th><th>Замеч.</th><th>Стадия</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr onclick="location='{{ url_for('contract', cid=r.id) }}'">
+        <td class="mono">{{ r.number_text }}</td>
+        <td class="mono">{{ r.signed_on.strftime('%d.%m.%y') if r.signed_on else '—' }}</td>
+        <td>{{ r.counterparty or '—' }}</td>
+        <td>{{ r.subject|truncate(48) }}</td>
+        <td class="mono">{{ '{:,.0f}'.format(r.amount).replace(',', ' ') ~ ' ₽' if r.amount else '—' }}</td>
+        <td>{% if r.open_findings %}<span class="pill crit">{{ r.open_findings }}</span>{% else %}<span class="pill ok">чисто</span>{% endif %}</td>
+        <td><span class="pill">{{ STAGE_RU.get(r.stage, r.stage) }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="empty">
+    <p>Договоров пока нет.</p>
+    <p class="muted">База создана и готова. Следующим шагом сюда загрузятся 62 договора из папки.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

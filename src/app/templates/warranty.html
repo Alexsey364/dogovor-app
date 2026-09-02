@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block crumb %}Гарантии{% endblock %}
+{% block body %}
+<div class="note">
+  Гарантия отсчитывается <b>от даты ввода в эксплуатацию</b>, а не от даты договора.
+  Пока дата ввода не проставлена, срок окончания вычислить не из чего — она есть в актах.
+</div>
+<div class="card">
+  <div class="card-h"><h2>{{ rows|length }} объектов на гарантии</h2></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Договор</th><th>Заказчик</th><th>Объект</th><th>Гарантия</th><th>Дата ввода</th><th>Действует до</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr onclick="location='{{ url_for('contract', cid=r.id) }}'">
+        <td class="mono">{{ r.number_text }}</td>
+        <td>{{ r.counterparty or '—' }}</td>
+        <td class="muted">{{ (r.object or '—')|truncate(30) }}</td>
+        <td class="mono">{% if r.warranty_months >= 60 %}<span class="pill crit">{{ r.warranty_months }} мес.</span>{% else %}{{ r.warranty_months }} мес.{% endif %}</td>
+        <td class="mono">{{ r.commissioning_date|dt if r.commissioning_date else '—' }}</td>
+        <td class="mono">{{ r.warranty_until|dt if r.warranty_until else 'нет даты ввода' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

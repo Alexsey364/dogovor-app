@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block crumb %}Мой день{% endblock %}
+{% block body %}
+
+<div class="stats">
+  <div class="stat s-acc"><div class="v">{{ stats.total }}</div><div class="l">договоров всего</div></div>
+  <div class="stat s-ok"><div class="v mono">{{ stats.total_amount|money }}</div><div class="l">на сумму</div></div>
+  <div class="stat s-crit"><div class="v">{{ sev.crit }}</div><div class="l">критических замечаний</div></div>
+  <div class="stat s-warn"><div class="v">{{ sev.warn }}</div><div class="l">предупреждений</div></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="card-h"><h2>Требует решения</h2><span class="badge crit">{{ critical|length }}</span></div>
+    {% if critical %}
+      {% for r in critical %}
+      <a class="find-row sev-critical" href="{{ url_for('contract', cid=r.id) }}">
+        <div class="fr-main">
+          <div class="fr-t">{{ r.sample }}{% if r.n > 1 %} <span class="muted">и ещё {{ r.n - 1 }}</span>{% endif %}</div>
+          <div class="fr-sub"><span class="mono">{{ r.number_text }}</span> · {{ r.counterparty or '—' }}</div>
+        </div>
+        <span class="chev">→</span>
+      </a>
+      {% endfor %}
+    {% else %}
+      <div class="empty muted">Критических замечаний нет.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-h"><h2>Предупреждения</h2><span class="badge warn">{{ warns|length }}</span></div>
+    {% if warns %}
+      {% for r in warns %}
+      <a class="find-row sev-warning" href="{{ url_for('contract', cid=r.id) }}">
+        <div class="fr-main">
+          <div class="fr-t">{{ r.sample }}{% if r.n > 1 %} <span class="muted">и ещё {{ r.n - 1 }}</span>{% endif %}</div>
+          <div class="fr-sub"><span class="mono">{{ r.number_text }}</span> · {{ r.counterparty or '—' }}</div>
+        </div>
+        <span class="chev">→</span>
+      </a>
+      {% endfor %}
+    {% else %}
+      <div class="empty muted">Предупреждений нет.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Движение по стадиям</h2><a class="link" href="{{ url_for('board') }}">доска →</a></div>
+  <div class="pipeline">
+    {% for s in stage_order %}
+      {% if by_stage.get(s) %}
+      <a class="pl-step" href="{{ url_for('board') }}">
+        <div class="pl-n">{{ by_stage.get(s) }}</div>
+        <div class="pl-l">{{ STAGE_RU[s] }}</div>
+      </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

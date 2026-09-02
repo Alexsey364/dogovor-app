@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block crumb %}Пользователи{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h"><h2>{{ rows|length }} учётных записей</h2></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Сотрудник</th><th>Логин</th><th>Роль</th><th>Отдел</th><th>Последний вход</th><th>Статус</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.full_name }}</td>
+        <td class="mono">{{ r.login }}</td>
+        <td><span class="pill role-{{ r.role_code }}">{{ r.role_name }}</span></td>
+        <td class="muted">{{ r.dept or '—' }}</td>
+        <td class="mono">{{ r.last_login_at|dt('%d.%m.%y %H:%M') if r.last_login_at else '—' }}</td>
+        <td>{% if r.is_active %}<span class="pill ok">активен</span>{% else %}<span class="pill">отключён</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  <div class="legend">Создание пользователей и смена пароля — следующий блок. Пока заведён администратор.</div>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Договорной контур{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2">
+</head>
+<body>
+{% if g.user %}
+<div class="app">
+  <aside class="side">
+    <div class="brand"><a href="{{ url_for('index') }}">Договорной контур</a>
+      <span>ООО «Римейк»</span></div>
+    <nav class="nav">
+      <div class="grp">Работа</div>
+      <a href="{{ url_for('index') }}" class="{{ 'on' if request.endpoint=='index' }}">
+        Мой день {% if nav and nav.findings %}<b class="hot">{{ nav.findings }}</b>{% endif %}</a>
+      <a href="{{ url_for('board') }}" class="{{ 'on' if request.endpoint=='board' }}">
+        Доска стадий <b>{{ nav.active if nav }}</b></a>
+      <a href="{{ url_for('warranty') }}" class="{{ 'on' if request.endpoint=='warranty' }}">
+        Гарантии <b>{{ nav.warranty if nav }}</b></a>
+
+      <div class="grp">Данные</div>
+      <a href="{{ url_for('registry') }}" class="{{ 'on' if request.endpoint in ('registry','contract') }}">
+        Реестр <b>{{ nav.contracts if nav }}</b></a>
+      <a href="{{ url_for('counterparties') }}" class="{{ 'on' if request.endpoint=='counterparties' }}">
+        Контрагенты <b>{{ nav.counterparties if nav }}</b></a>
+
+      <div class="grp">Настройка</div>
+      <a href="{{ url_for('users') }}" class="{{ 'on' if request.endpoint=='users' }}">
+        Пользователи <b>{{ nav.users if nav }}</b></a>
+      <a href="{{ url_for('permissions') }}" class="{{ 'on' if request.endpoint=='permissions' }}">Права ролей</a>
+    </nav>
+    <div class="side-foot"><span class="dot"></span>сервер в офисе · копия на NAS</div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="crumb">{% block crumb %}{% endblock %}</div>
+      <div class="who">
+        <span>{{ g.user.full_name }} · {{ g.user.role_name }}</span>
+        <a class="btn-ghost" href="{{ url_for('logout') }}">Выйти</a>
+      </div>
+    </header>
+    <div class="body">
+      {% with msgs = get_flashed_messages() %}
+        {% if msgs %}<div class="flash">{{ msgs[0] }}</div>{% endif %}
+      {% endwith %}
+      {% block body %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% else %}
+  {% block anon %}{% endblock %}
+{% endif %}
+</body>
+</html>

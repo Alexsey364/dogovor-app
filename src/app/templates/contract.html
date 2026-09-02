@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ c.number_text }} — Договорной контур{% endblock %}
+{% block crumb %}<a href="{{ url_for('registry') }}">Реестр</a> · {{ c.number_text }}{% endblock %}
+{% block body %}
+
+<div class="card">
+  <div class="doc-h">
+    <div>
+      <h2>{{ c.subject }}</h2>
+      <div class="sub"><span class="mono">{{ c.number_text }}</span> · {{ c.counterparty or '—' }}
+        {% if c.object_address %}<br>{{ c.object_address }}{% endif %}</div>
+    </div>
+    <div class="doc-tags">
+      <span class="pill stage-{{ c.stage }}">{{ STAGE_RU[c.stage] }}</span>
+      {% if c.cp_kind %}<span class="pill">{{ KIND_RU.get(c.cp_kind, c.cp_kind) }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="facts">
+    <div class="fact"><div class="k">Сумма</div><div class="v mono">{{ c.amount|money }}</div></div>
+    <div class="fact"><div class="k">Аванс</div><div class="v mono">{{ (c.advance_pct|round|int|string ~ ' %') if c.advance_pct else '—' }}{% if c.advance_amount %} · {{ c.advance_amount|money }}{% endif %}</div></div>
+    <div class="fact"><div class="k">Тип работ</div><div class="v">{{ c.type_name or '—' }}</div></div>
+    <div class="fact"><div class="k">Подписан</div><div class="v mono">{{ c.signed_on|dt if c.signed_on else 'не подписан' }}</div></div>
+    <div class="fact"><div class="k">Гарантия</div><div class="v">{{ (c.warranty_months|string ~ ' мес.') if c.warranty_months else '—' }}</div></div>
+    <div class="fact"><div class="k">Гарантия до</div><div class="v mono">{{ c.warranty_until|dt if c.warranty_until else 'нет даты ввода' }}</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Проверка договора</h2>
+    {% if findings %}<span class="badge crit">{{ findings|selectattr('severity','equalto','critical')|list|length }} крит.</span>{% else %}<span class="badge ok">чисто</span>{% endif %}
+  </div>
+  {% if findings %}
+    {% for f in findings %}
+    <div class="find sev-{{ f.severity }}">
+      <div class="find-sev">{{ SEV_RU[f.severity] }}</div>
+      <div class="find-body">
+        <div class="ft">{{ f.title }}{% if f.clause %} <span class="clause">{{ f.clause }}</span>{% endif %}</div>
+        {% if f.detail %}<div class="fd">{{ f.detail }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty muted">Замечаний при проверке не найдено.</div>
+  {% endif %}
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="card-h"><h2>Исполнение</h2></div>
+    <div class="kv"><b>Стадия</b><span>{{ STAGE_RU[c.stage] }}</span></div>
+    <div class="kv"><b>Ответственный</b><span class="muted">не назначен</span></div>
+    <div class="kv"><b>Акты и КС</b><span class="muted">будут здесь</span></div>
+    <div class="legend">Этапы работ, акты сдачи и КС-2/КС-3 появятся на этом месте — следующий блок разработки.</div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>Документы</h2></div>
+    <div class="kv"><b>Папка на сервере</b><span class="muted">{{ c.folder_path or 'не привязана' }}</span></div>
+    <div class="kv"><b>Внешний номер</b><span class="mono">{{ c.external_number or '—' }}</span></div>
+    <div class="kv"><b>ИКЗ</b><span class="mono">{{ c.ikz or '—' }}</span></div>
+    <div class="legend">Оригиналы договора, сметы и приложений останутся в папке на сервере; система хранит ссылку.</div>
+  </div>
+</div>
+{% endblock %}

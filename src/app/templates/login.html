@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block anon %}
+<div class="login-wrap">
+  <div class="login-box">
+    <h1>Договорной контур</h1>
+    <p class="sub">ООО «Римейк» · вход в систему</p>
+    {% with msgs = get_flashed_messages() %}
+      {% if msgs %}<div class="flash">{{ msgs[0] }}</div>{% endif %}
+    {% endwith %}
+    <form method="post">
+      <label>Логин<input name="login" autocomplete="username" autofocus required></label>
+      <label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn" type="submit">Войти</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
