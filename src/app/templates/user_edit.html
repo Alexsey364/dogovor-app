@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ url_for('users') }}">Пользователи</a> · {{ u.login }}{% endblock %}
+{% block body %}
+<div class="card" style="max-width:560px">
+  <div class="card-h"><h2>Пользователь {{ u.login }}</h2></div>
+  <form method="post" class="form">
+    <label>Фамилия и имя<input name="full_name" value="{{ u.full_name }}" required></label>
+    <label>Логин<input name="login" value="{{ u.login }}" required></label>
+    <label>Роль
+      <select name="role">
+        {% for r in roles %}<option value="{{ r.code }}" {{ 'selected' if r.code==u.role_code }}>{{ r.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Отдел
+      <select name="department"><option value="">—</option>
+        {% for d in depts %}<option value="{{ d.id }}" {{ 'selected' if d.id==u.department_id }}>{{ d.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" name="is_active" {{ 'checked' if u.is_active }}> Учётная запись активна</label>
+    <div class="form-foot">
+      <button class="btn" type="submit">Сохранить</button>
+      <a class="btn-ghost" href="{{ url_for('users') }}">Отмена</a>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="max-width:560px">
+  <div class="card-h"><h2>Пароль</h2></div>
+  <div style="padding:16px">
+    <div class="legend" style="padding:0 0 12px">Сброс задаёт новый временный пароль — он покажется один раз, а пользователь сменит его при первом входе.</div>
+    <form method="post"><input type="hidden" name="action" value="reset_password">
+      <button class="btn-ghost" type="submit" onclick="return confirm('Сбросить пароль {{ u.login }}?')">Сбросить пароль</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

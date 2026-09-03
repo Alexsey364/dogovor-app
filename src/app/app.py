@@ -729,7 +729,49 @@ def user_new():
 def user_toggle(uid):
     if uid != g.user["id"]:
         db.execute("UPDATE users SET is_active = NOT is_active WHERE id=%s", (uid,))
+        audit("user_toggle", "user", uid)
     return redirect(url_for("users"))
+
+
+@app.route("/users/<int:uid>/edit", methods=["GET", "POST"])
+@require_cap("manage_users")
+def user_edit(uid):
+    u = db.query_one("SELECT * FROM users WHERE id=%s", (uid,))
+    if not u:
+        abort(404)
+    depts = db.query("SELECT id, name FROM departments ORDER BY name")
+    roles = db.query("SELECT code, name FROM roles ORDER BY name")
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "reset_password":
+            import secrets as _s, string
+            pw = "".join(_s.choice(string.ascii_letters + string.digits) for _ in range(10))
+            db.execute("UPDATE users SET password_hash=%s, must_change_password=true WHERE id=%s",
+                       (generate_password_hash(pw), uid))
+            audit("user_reset_pw", "user", uid)
+            return render_template("user_created.html", login=u["login"], password=pw)
+        full_name = (request.form.get("full_name") or "").strip()
+        login_name = (request.form.get("login") or "").strip()
+        role = request.form.get("role") or u["role_code"]
+        dept = request.form.get("department") or None
+        is_active = request.form.get("is_active") == "on"
+        if not full_name or not login_name:
+            flash("Имя и логин обязательны")
+        elif db.query_one("SELECT 1 FROM users WHERE login=%s AND id<>%s", (login_name, uid)):
+            flash("Такой логин уже занят")
+        else:
+            # нельзя снять с себя админ-роль или отключить себя — чтобы не потерять доступ
+            if uid == g.user["id"] and (role != "admin" or not is_active):
+                flash("Нельзя снять права администратора или отключить самого себя")
+            else:
+                db.execute(
+                    "UPDATE users SET full_name=%s, login=%s, role_code=%s, department_id=%s, "
+                    "is_active=%s WHERE id=%s",
+                    (full_name, login_name, role, dept or None, is_active, uid))
+                audit("user_edit", "user", uid, after={"login": login_name, "role": role})
+                flash("Пользователь сохранён")
+                return redirect(url_for("users"))
+    return render_template("user_edit.html", u=u, depts=depts, roles=roles)
 
 
 @app.route("/contract/new", methods=["GET", "POST"])
