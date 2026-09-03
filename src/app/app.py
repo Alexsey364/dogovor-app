@@ -14,8 +14,12 @@ import secrets
 import threading
 from functools import wraps
 
+import hashlib
+import uuid
+
 from flask import (
-    Flask, session, request, redirect, url_for, render_template, abort, flash, g
+    Flask, session, request, redirect, url_for, render_template, abort, flash, g,
+    send_file
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -24,6 +28,16 @@ import review_engine
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
+app.config["MAX_CONTENT_LENGTH"] = 60 * 1024 * 1024  # до 60 МБ на файл
+
+FILES_DIR = os.getenv("FILES_DIR") or "C:/Users/claude/dogovor/files"
+
+FILE_KINDS = [
+    ("contract", "Договор"), ("estimate", "Смета"), ("ks2", "КС-2"),
+    ("ks3", "КС-3"), ("act", "Акт"), ("supplement", "Допсоглашение"),
+    ("protocol", "Протокол разногласий"), ("scan", "Скан"), ("other", "Другое"),
+]
+FILE_KIND_RU = dict(FILE_KINDS)
 
 STAGE_RU = {
     "draft": "черновик", "internal_review": "согласование",
@@ -38,6 +52,18 @@ SEV_RU = {"critical": "критично", "warning": "предупреждени
 KIND_RU = {"commercial": "коммерческий", "budget": "бюджет", "uk_tsj": "УК/ТСЖ",
            "government": "госконтракт", "individual": "физлицо/ИП"}
 
+def human_size(n):
+    if n is None:
+        return "—"
+    for unit in ("Б", "КБ", "МБ"):
+        if n < 1024:
+            return f"{n:.0f} {unit}" if unit == "Б" else f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} ГБ"
+
+
+app.jinja_env.globals.update(FILE_KIND_RU=FILE_KIND_RU, FILE_KINDS=FILE_KINDS,
+                             human_size=human_size)
 app.jinja_env.globals.update(STAGE_RU=STAGE_RU, SEV_RU=SEV_RU, KIND_RU=KIND_RU,
                              STAGE_ORDER=["draft", "internal_review", "legal_review",
                                           "at_counterparty", "in_progress", "completed",
@@ -314,7 +340,14 @@ def contract(cid: int):
         "SELECT id, severity, title, detail, clause, resolution FROM review_findings "
         "WHERE contract_id=%s ORDER BY CASE severity "
         "WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END, id", (cid,))
-    return render_template("contract.html", c=c, findings=findings)
+    files = db.query("""
+        SELECT cf.id, cf.kind, cf.version, cf.file_name, cf.size_bytes,
+               cf.uploaded_at, u.full_name AS uploader
+        FROM contract_files cf LEFT JOIN users u ON u.id=cf.uploaded_by
+        WHERE cf.contract_id=%s
+        ORDER BY cf.kind, cf.version DESC, cf.id DESC
+    """, (cid,))
+    return render_template("contract.html", c=c, findings=findings, files=files)
 
 
 # ------------------------------------------------------------------
@@ -675,6 +708,65 @@ def search():
             ORDER BY c.number_text DESC LIMIT 100
         """, (like, like, like, like, like))
     return render_template("search.html", q=q, rows=rows)
+
+
+@app.route("/contract/<int:cid>/upload", methods=["POST"])
+@login_required
+def contract_upload(cid):
+    if not can("edit_contract"):
+        abort(403)
+    c = db.query_one("SELECT id FROM contracts WHERE id=%s", (cid,))
+    if not c:
+        abort(404)
+    f = request.files.get("file")
+    kind = request.form.get("kind", "other")
+    if kind not in FILE_KIND_RU:
+        kind = "other"
+    if not f or not f.filename:
+        flash("Файл не выбран")
+        return redirect(url_for("contract", cid=cid))
+    data = f.read()
+    if not data:
+        flash("Пустой файл")
+        return redirect(url_for("contract", cid=cid))
+    sha = hashlib.sha256(data).hexdigest()
+    # уже загружали ровно этот файл?
+    dup = db.query_one("SELECT id FROM contract_files WHERE contract_id=%s AND sha256=%s",
+                       (cid, sha))
+    if dup:
+        flash("Такой файл уже загружен (совпадает содержимое)")
+        return redirect(url_for("contract", cid=cid))
+    ext = os.path.splitext(f.filename)[1][:12]
+    disk = uuid.uuid4().hex + ext
+    folder = os.path.join(FILES_DIR, str(cid))
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, disk), "wb") as out:
+        out.write(data)
+    ver = (db.query_one(
+        "SELECT coalesce(max(version),0)+1 AS v FROM contract_files WHERE contract_id=%s AND kind=%s",
+        (cid, kind)) or {"v": 1})["v"]
+    fid = db.query_one(
+        "INSERT INTO contract_files(contract_id, version, kind, file_name, file_path, "
+        "size_bytes, sha256, uploaded_by) VALUES(%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+        (cid, ver, kind, f.filename, os.path.join(folder, disk), len(data), sha,
+         g.user["id"]))["id"]
+    audit("upload", "contract", cid,
+          after={"file": f.filename, "kind": kind, "version": ver})
+    flash(f"Файл загружен: {f.filename} (версия {ver})")
+    return redirect(url_for("contract", cid=cid))
+
+
+@app.route("/file/<int:fid>")
+@login_required
+def file_download(fid):
+    if perm_level("view_contracts") == "none":
+        abort(403)
+    row = db.query_one(
+        "SELECT file_name, file_path, contract_id FROM contract_files WHERE id=%s", (fid,))
+    if not row or not os.path.exists(row["file_path"]):
+        abort(404)
+    audit("download", "contract", row["contract_id"], after={"file": row["file_name"]})
+    return send_file(row["file_path"], as_attachment=True, download_name=row["file_name"])
 
 
 @app.route("/contract/<int:cid>/history")
