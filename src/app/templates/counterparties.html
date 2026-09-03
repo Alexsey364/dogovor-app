@@ -7,7 +7,7 @@
     <thead><tr><th>Организация</th><th>Тип</th><th>Договоров</th><th>Сумма</th><th>Аннулировано</th></tr></thead>
     <tbody>
       {% for r in rows %}
-      <tr>
+      <tr onclick="location='{{ url_for('counterparty', pid=r.id) }}'" style="cursor:pointer">
         <td>{{ r.name }}</td>
         <td><span class="pill">{{ KIND_RU.get(r.kind, r.kind) }}</span></td>
         <td class="mono">{{ r.n }}</td>

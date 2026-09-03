@@ -305,3 +305,9 @@ tbody tr:last-child td{border-bottom:none}
   .nav a{border-left:none;padding:6px 10px}.side-foot{display:none}
   .grid2{grid-template-columns:1fr}
 }
+
+/* ---- карточка контрагента ---- */
+.rel{text-align:center;padding:4px 14px}
+.rel-v{font-size:30px;font-weight:700;color:var(--ok)}
+.rel-l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.crit-num{color:var(--crit)}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ cp.name }} — Договорной контур{% endblock %}
+{% block crumb %}<a href="{{ url_for('counterparties') }}">Контрагенты</a> · {{ cp.name }}{% endblock %}
+{% block body %}
+
+<div class="card">
+  <div class="doc-h">
+    <div>
+      <h2>{{ cp.name }}</h2>
+      <div class="sub">
+        <span class="pill">{{ KIND_RU.get(cp.kind, cp.kind) }}</span>
+        {% if cp.inn %} · ИНН {{ cp.inn }}{% endif %}
+        {% if cp.address %}<br>{{ cp.address }}{% endif %}
+      </div>
+    </div>
+    {% if reliability is not none %}
+    <div class="rel">
+      <div class="rel-v">{{ reliability }}%</div>
+      <div class="rel-l">надёжность</div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="facts">
+    <div class="fact"><div class="k">Договоров</div><div class="v mono">{{ m.total }}</div></div>
+    <div class="fact"><div class="k">В работе</div><div class="v mono">{{ m.active }}</div></div>
+    <div class="fact"><div class="k">Завершено</div><div class="v mono">{{ m.completed }}</div></div>
+    <div class="fact"><div class="k">Аннулировано</div><div class="v mono {{ 'crit-num' if m.cancelled }}">{{ m.cancelled }}</div></div>
+    {% if perm_level('payments') != 'none' %}
+    <div class="fact"><div class="k">Сумма договоров</div><div class="v mono">{{ m.total_amount|money }}</div></div>
+    {% endif %}
+    <div class="fact"><div class="k">Открытых замечаний</div><div class="v mono {{ 'crit-num' if m.findings }}">{{ m.findings }}</div></div>
+  </div>
+  {% if m.cancelled %}
+  <div class="legend">Надёжность = доля не аннулированных договоров. {{ m.cancelled }} из {{ m.total }} аннулировано — стоит посмотреть причины.</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Договоры этого заказчика</h2></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Номер</th><th>Дата</th><th>Предмет</th><th>Объект</th><th>Сумма</th><th>Замеч.</th><th>Стадия</th></tr></thead>
+    <tbody>
+      {% for c in contracts %}
+      <tr onclick="location='{{ url_for('contract', cid=c.id) }}'">
+        <td class="mono">{{ c.number_text }}</td>
+        <td class="mono">{{ c.signed_on|dt('%d.%m.%y') }}</td>
+        <td>{{ c.subject|truncate(34) }}</td>
+        <td class="muted">{{ (c.object or '—')|truncate(24) }}</td>
+        <td class="mono">{{ c.amount|money }}</td>
+        <td>{% if c.findings %}<span class="pill crit">{{ c.findings }}</span>{% else %}<span class="pill ok">чисто</span>{% endif %}</td>
+        <td><span class="pill stage-{{ c.stage }}">{{ STAGE_RU[c.stage] }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

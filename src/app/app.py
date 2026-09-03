@@ -490,6 +490,37 @@ def payment_schedule(cid):
     return redirect(url_for("contract", cid=cid))
 
 
+@app.route("/counterparty/<int:pid>")
+@login_required
+def counterparty(pid):
+    cp = db.query_one("SELECT * FROM counterparties WHERE id=%s", (pid,))
+    if not cp:
+        abort(404)
+    m = db.query_one("""
+        SELECT count(*) AS total,
+               count(*) FILTER (WHERE stage='cancelled') AS cancelled,
+               count(*) FILTER (WHERE stage='completed') AS completed,
+               count(*) FILTER (WHERE stage NOT IN ('cancelled','archived','completed')) AS active,
+               count(*) FILTER (WHERE warranty_months IS NOT NULL) AS warranty,
+               coalesce(sum(amount) FILTER (WHERE stage<>'cancelled'),0) AS total_amount,
+               (SELECT count(*) FROM review_findings rf JOIN contracts c2 ON c2.id=rf.contract_id
+                 WHERE c2.counterparty_id=%s AND rf.resolution IS NULL) AS findings
+        FROM contracts WHERE counterparty_id=%s
+    """, (pid, pid)) or {}
+    contracts = db.query("""
+        SELECT c.id, c.number_text, c.subject, c.amount, c.stage, c.signed_on,
+               o.address AS object,
+               (SELECT count(*) FROM review_findings rf WHERE rf.contract_id=c.id AND rf.resolution IS NULL) AS findings
+        FROM contracts c LEFT JOIN objects o ON o.id=c.object_id
+        WHERE c.counterparty_id=%s ORDER BY c.number_text DESC
+    """, (pid,))
+    total = m.get("total") or 0
+    cancelled = m.get("cancelled") or 0
+    reliability = round((total - cancelled) / total * 100) if total else None
+    return render_template("counterparty.html", cp=cp, m=m, contracts=contracts,
+                           reliability=reliability)
+
+
 @app.route("/counterparties")
 @login_required
 def counterparties():
