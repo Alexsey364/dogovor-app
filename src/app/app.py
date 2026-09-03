@@ -321,15 +321,55 @@ def board():
 @login_required
 def registry():
     flt = request.args.get("f", "all")
-    where = "1=1"
+    clauses = []
+    params = []
+    # быстрые вкладки
     if flt == "active":
-        where = "c.stage NOT IN ('archived','cancelled')"
+        clauses.append("c.stage NOT IN ('archived','cancelled')")
     elif flt == "cancelled":
-        where = "c.stage='cancelled'"
+        clauses.append("c.stage='cancelled'")
     elif flt == "findings":
-        where = "EXISTS (SELECT 1 FROM review_findings rf WHERE rf.contract_id=c.id AND rf.resolution IS NULL)"
+        clauses.append("EXISTS (SELECT 1 FROM review_findings rf "
+                        "WHERE rf.contract_id=c.id AND rf.resolution IS NULL)")
     elif flt == "warranty":
-        where = "c.warranty_months IS NOT NULL"
+        clauses.append("c.warranty_months IS NOT NULL")
+
+    # параметрические фильтры
+    q = (request.args.get("q") or "").strip()
+    if q:
+        clauses.append("(c.number_text ILIKE %s OR c.external_number ILIKE %s "
+                       "OR cp.name ILIKE %s OR o.address ILIKE %s OR c.subject ILIKE %s)")
+        params += [f"%{q}%"] * 5
+    f_type = request.args.get("type") or ""
+    if f_type:
+        clauses.append("c.type_code = %s")
+        params.append(f_type)
+    f_cp = request.args.get("cp") or ""
+    if f_cp.isdigit():
+        clauses.append("c.counterparty_id = %s")
+        params.append(int(f_cp))
+    f_stage = request.args.get("stage") or ""
+    if f_stage:
+        clauses.append("c.stage = %s")
+        params.append(f_stage)
+    d_from = request.args.get("from") or ""
+    if d_from:
+        clauses.append("c.signed_on >= %s")
+        params.append(d_from)
+    d_to = request.args.get("to") or ""
+    if d_to:
+        clauses.append("c.signed_on <= %s")
+        params.append(d_to)
+    a_min = (request.args.get("amin") or "").replace(" ", "")
+    if a_min.isdigit():
+        clauses.append("c.amount >= %s")
+        params.append(int(a_min))
+    a_max = (request.args.get("amax") or "").replace(" ", "")
+    if a_max.isdigit():
+        clauses.append("c.amount <= %s")
+        params.append(int(a_max))
+
+    where = " AND ".join(clauses) if clauses else "1=1"
     rows = db.query(f"""
         SELECT c.id, c.number_text, c.subject, c.amount, c.advance_pct, c.stage,
                c.signed_on, c.warranty_months, cp.name AS counterparty,
@@ -341,9 +381,15 @@ def registry():
         LEFT JOIN contract_types ct ON ct.code=c.type_code
         LEFT JOIN objects o ON o.id=c.object_id
         WHERE {where}
-        ORDER BY c.number_text DESC LIMIT 300
-    """)
-    return render_template("registry.html", rows=rows, flt=flt)
+        ORDER BY c.number_text DESC LIMIT 500
+    """, tuple(params))
+    total_amount = sum(float(r["amount"]) for r in rows if r["amount"])
+    types = db.query("SELECT code, name FROM contract_types ORDER BY name")
+    cps = db.query("SELECT id, name FROM counterparties WHERE is_active ORDER BY name")
+    args = request.args
+    adv = any(args.get(k) for k in ("q", "type", "cp", "stage", "from", "to", "amin", "amax"))
+    return render_template("registry.html", rows=rows, flt=flt, types=types, cps=cps,
+                           args=args, adv=adv, total_amount=total_amount)
 
 
 @app.route("/contract/<int:cid>")

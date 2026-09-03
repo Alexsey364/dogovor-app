@@ -3,7 +3,7 @@
 {% block body %}
 <div class="card">
   <div class="card-h">
-    <h2>{{ rows|length }} договоров</h2>
+    <h2>{{ rows|length }} договоров{% if total_amount %} · <span class="mono muted">{{ total_amount|money }}</span>{% endif %}</h2>
     {% if can('reports') %}<a class="btn-ghost" href="{{ url_for('export_registry') }}">Excel</a>{% endif %}
     {% if can('create_contract') %}<a class="btn-sm" href="{{ url_for('contract_new') }}">+ Договор</a>{% endif %}
     <div class="filters">
@@ -13,6 +13,41 @@
       {% endfor %}
     </div>
   </div>
+
+  <details class="filter-panel" {{ 'open' if adv }}>
+    <summary>Расширенный поиск{% if adv %} · <span class="muted">фильтры применены</span>{% endif %}</summary>
+    <form class="filter-form" method="get" action="{{ url_for('registry') }}">
+      <input type="hidden" name="f" value="{{ flt }}">
+      <label>Текст<input name="q" value="{{ args.get('q','') }}" placeholder="номер, заказчик, адрес, предмет"></label>
+      <label>Тип работ
+        <select name="type">
+          <option value="">— любой —</option>
+          {% for t in types %}<option value="{{ t.code }}"{{ ' selected' if args.get('type')==t.code }}>{{ t.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Заказчик
+        <select name="cp">
+          <option value="">— любой —</option>
+          {% for cp in cps %}<option value="{{ cp.id }}"{{ ' selected' if args.get('cp')==cp.id|string }}>{{ cp.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Стадия
+        <select name="stage">
+          <option value="">— любая —</option>
+          {% for code in STAGE_ORDER %}<option value="{{ code }}"{{ ' selected' if args.get('stage')==code }}>{{ STAGE_RU[code] }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Подписан с<input type="date" name="from" value="{{ args.get('from','') }}"></label>
+      <label>по<input type="date" name="to" value="{{ args.get('to','') }}"></label>
+      <label>Сумма от<input name="amin" value="{{ args.get('amin','') }}" placeholder="₽" inputmode="numeric"></label>
+      <label>до<input name="amax" value="{{ args.get('amax','') }}" placeholder="₽" inputmode="numeric"></label>
+      <div class="filter-foot">
+        <button class="btn-sm" type="submit">Показать</button>
+        <a class="btn-ghost" href="{{ url_for('registry') }}">Сбросить</a>
+      </div>
+    </form>
+  </details>
+
   <div class="tablewrap"><table>
     <thead><tr><th>Номер</th><th>Дата</th><th>Заказчик</th><th>Объект</th><th>Сумма</th><th>Аванс</th><th>Гар.</th><th>Замеч.</th><th>Стадия</th></tr></thead>
     <tbody>
@@ -31,5 +66,6 @@
       {% endfor %}
     </tbody>
   </table></div>
+  {% if not rows %}<div class="empty muted">Ничего не найдено. Измените условия поиска.</div>{% endif %}
 </div>
 {% endblock %}
