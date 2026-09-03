@@ -626,6 +626,40 @@ STAGES = ["draft", "internal_review", "legal_review", "at_counterparty",
           "in_progress", "completed", "warranty", "archived", "cancelled", "on_hold"]
 
 
+@app.route("/rules-catalog", methods=["GET", "POST"])
+@require_cap("manage_permissions")
+def rules_catalog():
+    if request.method == "POST":
+        all_rules = db.query("SELECT code FROM review_rules")
+        for r in all_rules:
+            on = request.form.get("rule_" + r["code"]) == "on"
+            db.execute("UPDATE review_rules SET enabled=%s WHERE code=%s", (on, r["code"]))
+        audit("rules", "review_rules", 0)
+        flash("Набор правил сохранён")
+        return redirect(url_for("rules_catalog"))
+    rules = db.query("SELECT code, name, description, severity, category, needs_text, enabled "
+                     "FROM review_rules ORDER BY ord")
+    groups = {}
+    for r in rules:
+        groups.setdefault(r["category"], []).append(r)
+    return render_template("rules_catalog.html", groups=groups)
+
+
+@app.route("/contract/<int:cid>/ai_review", methods=["POST"])
+@login_required
+def contract_ai_review(cid):
+    if not can("review_decide") and g.user["role_code"] != "admin":
+        abort(403)
+    # ИИ-проверка требует: текст договора в системе + ключ API + согласие.
+    # Пока не настроена — честно сообщаем и не отправляем ничего наружу.
+    if not os.getenv("AI_API_KEY"):
+        flash("Умная проверка ИИ ещё не подключена: нужен ключ API и распознанный "
+              "текст договора. Для секретных договоров она будет отключена.")
+        return redirect(url_for("contract", cid=cid))
+    flash("Умная проверка ИИ пока в разработке")
+    return redirect(url_for("contract", cid=cid))
+
+
 @app.route("/contract/<int:cid>/stage", methods=["POST"])
 @login_required
 def contract_stage(cid):

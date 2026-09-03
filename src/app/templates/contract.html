@@ -43,7 +43,10 @@
       {% set open_crit = findings|selectattr('resolution','none')|selectattr('severity','equalto','critical')|list|length %}
       {% if open_crit %}<span class="badge crit">{{ open_crit }} крит.</span>{% else %}<span class="badge ok">чисто</span>{% endif %}
       <form method="post" action="{{ url_for('contract_review', cid=c.id) }}" class="inline">
-        <button class="btn-sm" type="submit">Проверить</button>
+        <button class="btn-sm" type="submit" title="Проверка по набору правил">Проверить (правила)</button>
+      </form>
+      <form method="post" action="{{ url_for('contract_ai_review', cid=c.id) }}" class="inline">
+        <button class="btn-sm ai" type="submit" title="Умный разбор текста договора">Умная проверка ИИ</button>
       </form>
     </div>
   </div>

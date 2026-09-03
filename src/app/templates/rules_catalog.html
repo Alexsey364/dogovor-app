@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block crumb %}Правила проверки{% endblock %}
+{% block body %}
+<div class="note">
+  <b>Проверка по правилам.</b> Здесь весь набор проверок. Каждое правило можно
+  включить или выключить — лишние отключите галочкой. При нажатии «Проверить»
+  на карточке договора прогоняются только включённые. Правила с пометкой
+  <span class="pill">по тексту</span> начнут работать, когда к договору привязан
+  файл и распознан текст.
+</div>
+
+<form method="post">
+  <div class="form-foot" style="border:none;padding:0 0 14px">
+    <button class="btn" type="submit">Сохранить набор</button>
+  </div>
+  {% for cat, rules in groups.items() %}
+  <div class="card">
+    <div class="card-h"><h2>{{ cat }}</h2><span class="badge">{{ rules|length }}</span></div>
+    {% for r in rules %}
+    <label class="rule-row">
+      <input type="checkbox" name="rule_{{ r.code }}" {{ 'checked' if r.enabled }}>
+      <span class="rule-body">
+        <span class="rule-name">{{ r.name }}
+          <span class="sev sev-{{ r.severity }}">{{ SEV_RU[r.severity] }}</span>
+          {% if r.needs_text %}<span class="pill">по тексту</span>{% endif %}
+        </span>
+        <span class="rule-desc">{{ r.description }}</span>
+      </span>
+    </label>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <div class="form-foot" style="border:none">
+    <button class="btn" type="submit">Сохранить набор</button>
+    <span class="muted">Изменения применяются при следующем запуске проверки</span>
+  </div>
+</form>
+{% endblock %}

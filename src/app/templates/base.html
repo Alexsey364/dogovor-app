@@ -39,6 +39,7 @@
       {% if can('manage_permissions') %}
       <a href="{{ url_for('permissions') }}" class="{{ 'on' if request.endpoint=='permissions' }}">Права ролей</a>
       <a href="{{ url_for('roles_page') }}" class="{{ 'on' if request.endpoint=='roles_page' }}">Роли</a>
+      <a href="{{ url_for('rules_catalog') }}" class="{{ 'on' if request.endpoint=='rules_catalog' }}">Правила проверки</a>
       {% endif %}
       {% endif %}
     </nav>
