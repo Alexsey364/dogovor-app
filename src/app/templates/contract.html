@@ -128,9 +128,19 @@
   <div class="card">
     <div class="card-h"><h2>Исполнение</h2></div>
     <div class="kv"><b>Стадия</b><span>{{ STAGE_RU[c.stage] }}</span></div>
-    <div class="kv"><b>Ответственный</b><span class="muted">не назначен</span></div>
-    <div class="kv"><b>Акты и КС</b><span class="muted">будут здесь</span></div>
-    <div class="legend">Этапы работ, акты сдачи и КС-2/КС-3 — следующий блок разработки.</div>
+    <div class="kv"><b>Дата окончания работ</b><span class="mono">{{ c.completed_on|dt if c.completed_on else '—' }}</span></div>
+    <div class="kv"><b>Дата ввода в эксплуатацию</b><span class="mono">{{ c.commissioning_date|dt if c.commissioning_date else '—' }}</span></div>
+    <div class="kv"><b>Гарантия действует до</b><span class="mono">{{ c.warranty_until|dt if c.warranty_until else 'нужна дата ввода' }}</span></div>
+    {% if can('edit_contract') %}
+    <form method="post" action="{{ url_for('contract_execution', cid=c.id) }}" class="exec-form">
+      <label>Окончание работ<input type="date" name="completed_on" value="{{ c.completed_on|dt('%Y-%m-%d') if c.completed_on else '' }}"></label>
+      <label>Ввод в эксплуатацию<input type="date" name="commissioning_date" value="{{ c.commissioning_date|dt('%Y-%m-%d') if c.commissioning_date else '' }}"></label>
+      <button class="btn-sm" type="submit">Сохранить даты</button>
+    </form>
+    <div class="legend">Заполните дату ввода — конец гарантии посчитается сам ({{ c.warranty_months or '—' }} мес.). Даты берутся из актов.</div>
+    {% else %}
+    <div class="legend">Даты ввода и окончания заполняет ответственный по актам.</div>
+    {% endif %}
   </div>
   <div class="card">
     <div class="card-h"><h2>Реквизиты</h2></div>

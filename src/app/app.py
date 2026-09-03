@@ -702,6 +702,22 @@ def contract_edit(cid):
     return render_template("contract_edit.html", c=c, types=types)
 
 
+@app.route("/contract/<int:cid>/execution", methods=["POST"])
+@login_required
+def contract_execution(cid):
+    if not can("edit_contract"):
+        abort(403)
+    comm = request.form.get("commissioning_date") or None
+    comp = request.form.get("completed_on") or None
+    db.execute(
+        "UPDATE contracts SET commissioning_date=%s, completed_on=%s, updated_at=now() WHERE id=%s",
+        (comm, comp, cid))
+    audit("execution", "contract", cid,
+          after={"commissioning": comm, "completed": comp})
+    flash("Даты исполнения сохранены")
+    return redirect(url_for("contract", cid=cid))
+
+
 @app.route("/finding/<int:fid>/resolve", methods=["POST"])
 @login_required
 def finding_resolve(fid):
