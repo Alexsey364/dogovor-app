@@ -3,7 +3,8 @@
 {% block body %}
 <div class="card">
   <div class="card-h"><h2>Стадии</h2>
-    <button class="btn-sm" type="button" id="allcols">Показать все</button>
+    <div class="row-gap"><span class="muted" style="font-size:12.5px">в колонках новые сверху (по дате смены стадии)</span>
+      <button class="btn-sm" type="button" id="allcols">Показать все</button></div>
   </div>
   <div class="colfilter" id="colfilter">
     {% for s in stage_order %}
@@ -22,7 +23,7 @@
       <span class="num">{{ r.number_text }}</span>
       <span class="ttl">{{ r.counterparty or '—' }}</span>
       <span class="meta">
-        <span class="mono">{{ r.amount|money }}</span>
+        <span class="mono">{{ r.stage_since|dt('%d.%m.%y') if r.stage_since else '' }}</span>
         {% if r.crit %}<span class="pill crit">{{ r.crit }}</span>{% endif %}
       </span>
     </a>

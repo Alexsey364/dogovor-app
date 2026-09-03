@@ -12,6 +12,7 @@
     </div>
     <div class="doc-tags">
       <span class="pill stage-{{ c.stage }}">{{ STAGE_RU[c.stage] }}</span>
+      {% if c.stage_since %}<span class="since">в этой стадии с {{ c.stage_since|dt }}</span>{% endif %}
       {% if c.cp_kind %}<span class="pill">{{ KIND_RU.get(c.cp_kind, c.cp_kind) }}</span>{% endif %}
     </div>
   </div>
@@ -26,10 +27,11 @@
   {% if g.user.role_code in ('manager','lawyer','admin') %}
   <div class="doc-actions">
     <form method="post" action="{{ url_for('contract_stage', cid=c.id) }}" class="inline">
+      <label class="mut-label">Стадия:</label>
       <select name="stage">
         {% for s in STAGE_ORDER %}<option value="{{ s }}" {{ 'selected' if s==c.stage }}>{{ STAGE_RU[s] }}</option>{% endfor %}
       </select>
-      <button class="btn-sm" type="submit">Сменить стадию</button>
+      <button class="btn-sm" type="submit">Сменить</button>
     </form>
     <a class="btn-ghost" href="{{ url_for('contract_edit', cid=c.id) }}">Редактировать</a>
     <a class="btn-ghost" href="{{ url_for('contract_history', cid=c.id) }}">История</a>

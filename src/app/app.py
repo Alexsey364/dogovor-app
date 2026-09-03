@@ -275,13 +275,13 @@ def index():
 @login_required
 def board():
     rows = db.query("""
-        SELECT c.id, c.number_text, c.subject, c.amount, c.stage,
+        SELECT c.id, c.number_text, c.subject, c.amount, c.stage, c.stage_since,
                cp.name AS counterparty,
                (SELECT count(*) FROM review_findings rf
                  WHERE rf.contract_id=c.id AND rf.resolution IS NULL
                    AND rf.severity='critical') AS crit
         FROM contracts c LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
-        ORDER BY c.amount DESC NULLS LAST
+        ORDER BY c.stage_since DESC NULLS LAST, c.id DESC
     """)
     cols = {s: [] for s in STAGE_ORDER}
     for r in rows:
@@ -669,8 +669,13 @@ def contract_stage(cid):
     if new_stage not in STAGES:
         abort(400)
     old = db.query_one("SELECT stage FROM contracts WHERE id=%s", (cid,))
-    db.execute("UPDATE contracts SET stage=%s, updated_at=now() WHERE id=%s", (new_stage, cid))
-    audit("stage", "contract", cid, before=old, after={"stage": new_stage})
+    if old and old["stage"] == new_stage:
+        flash("Стадия не изменилась")
+        return redirect(url_for("contract", cid=cid))
+    db.execute("UPDATE contracts SET stage=%s, stage_since=now(), updated_at=now() WHERE id=%s",
+               (new_stage, cid))
+    audit("stage", "contract", cid, before=old,
+          after={"stage": new_stage, "from": STAGE_RU.get(old["stage"] if old else "", "")})
     flash(f"Стадия изменена: {STAGE_RU.get(new_stage, new_stage)}")
     return redirect(url_for("contract", cid=cid))
 
