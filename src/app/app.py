@@ -25,6 +25,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
 import review_engine
+import text_extract
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
@@ -1019,14 +1020,25 @@ def contract_upload(cid):
     ver = (db.query_one(
         "SELECT coalesce(max(version),0)+1 AS v FROM contract_files WHERE contract_id=%s AND kind=%s",
         (cid, kind)) or {"v": 1})["v"]
+    full = os.path.join(folder, disk)
+    text = text_extract.extract(full, f.filename)
+    has_text = bool(text)
     fid = db.query_one(
         "INSERT INTO contract_files(contract_id, version, kind, file_name, file_path, "
-        "size_bytes, sha256, uploaded_by) VALUES(%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-        (cid, ver, kind, f.filename, os.path.join(folder, disk), len(data), sha,
-         g.user["id"]))["id"]
+        "size_bytes, sha256, uploaded_by, has_text_layer, extracted_text) "
+        "VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+        (cid, ver, kind, f.filename, full, len(data), sha,
+         g.user["id"], has_text, text or None))["id"]
     audit("upload", "contract", cid,
           after={"file": f.filename, "kind": kind, "version": ver})
-    flash(f"Файл загружен: {f.filename} (версия {ver})")
+    msg = f"Файл загружен: {f.filename} (версия {ver})"
+    if has_text and kind == "contract":
+        n = review_engine.run(cid)
+        if n:
+            msg += f". Проверка по тексту нашла замечаний: {n}"
+    elif ext.lower() in (".pdf", ".docx") and not has_text:
+        msg += ". Текст не распознан (скан без текстового слоя)"
+    flash(msg)
     return redirect(url_for("contract", cid=cid))
 
 

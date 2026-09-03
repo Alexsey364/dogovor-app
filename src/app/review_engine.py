@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 from datetime import date
 
@@ -167,25 +168,61 @@ def _no_file(c):
     return "Файл договора не приложен." if not n else None
 
 
-# ---- текстовые (заглушки до распознавания текста) ----
+# ---- текстовые (по распознанному тексту файла договора) ----
+
+MONTHS = "январ|феврал|март|апрел|мая|мае|июн|июл|август|сентябр|октябр|ноябр|декабр"
+
 
 @rule("wrong_year")
 def _wrong_year(c):
-    return None  # активируется при наличии текста договора
+    txt = c.get("_text") or ""
+    if not txt:
+        return None
+    m = re.search(r"-(\d{4})\s*$", (c["number_text"] or "").strip())
+    if not m:
+        return None
+    year_num = int(m.group(1))
+    years = set()
+    for mm in re.finditer(r"«?\d{1,2}»?\s*(?:" + MONTHS + r")\w*\s*(\d{4})", txt):
+        years.add(int(mm.group(1)))
+    wrong = sorted(y for y in years if abs(y - year_num) <= 5 and y != year_num)
+    if wrong:
+        return (f"В тексте дата {wrong[0]} года, а номер и папка — {year_num}. "
+                "Похоже, год не поправили при копировании шаблона.")
+    return None
 
 
 @rule("object_not_named")
 def _object_not_named(c):
+    txt = c.get("_text") or ""
+    if not txt:
+        return None
+    if re.search(r"на объекте заказчика|на сво[её]м объекте", txt, re.I) and not c["object_id"]:
+        return "В тексте «на объекте заказчика», конкретный адрес не указан, объект не привязан."
     return None
 
 
 @rule("vat_article_145")
 def _vat_article_145(c):
+    txt = c.get("_text") or ""
+    if txt and re.search(r"НДС\s*5\s*%.{0,40}ст\.?\s*145", txt, re.I | re.S):
+        return ("«НДС 5% согласно ст. 145 НК РФ». Ст. 145 — про освобождение от НДС, "
+                "ставку 5% для УСН вводит п. 8 ст. 164. Показать бухгалтеру.")
     return None
 
 
 @rule("deadline_out_of_control")
 def _deadline_out_of_control(c):
+    txt = c.get("_text") or ""
+    if not txt:
+        return None
+    hits = []
+    if re.search(r"с момента поступления аванса", txt, re.I):
+        hits.append("срок работ — от поступления аванса")
+    if re.search(r"передачи е?го на обслуживание", txt, re.I):
+        hits.append("гарантия — от передачи объекта на обслуживание сторонней организации")
+    if hits:
+        return "; ".join(hits).capitalize() + " — событие вне вашего контроля."
     return None
 
 
@@ -196,6 +233,12 @@ def run(contract_id: int) -> int:
     c = db.query_one("SELECT * FROM contracts WHERE id=%s", (contract_id,))
     if not c:
         return 0
+    # текст договора из распознанных файлов
+    t = db.query_one(
+        "SELECT string_agg(extracted_text, chr(10)) AS t FROM contract_files "
+        "WHERE contract_id=%s AND extracted_text IS NOT NULL", (contract_id,))
+    c = dict(c)
+    c["_text"] = (t or {}).get("t") or ""
     rules = db.query(
         "SELECT code, name, severity FROM review_rules WHERE enabled=true ORDER BY ord")
     added = 0
