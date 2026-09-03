@@ -266,6 +266,64 @@
   </div>
 </div>
 
+<div class="card" id="tasks">
+  <div class="card-h"><h2>Задачи и поручения</h2>
+    <span class="badge">{{ tasks|selectattr('is_done','equalto',false)|list|length }} открыто</span></div>
+  {% if tasks %}
+  <div class="tasklist">
+    {% for t in tasks %}
+    <div class="task{{ ' task-done' if t.is_done }} prio-{{ t.priority }}">
+      {% if can('tasks') %}
+      <form method="post" action="{{ url_for('task_done', tid=t.id) }}" class="inline">
+        <button class="task-check" type="submit" title="{{ 'Вернуть в работу' if t.is_done else 'Отметить выполненной' }}">
+          {{ '✔' if t.is_done else '' }}</button>
+      </form>
+      {% else %}<span class="task-check" aria-hidden="true">{{ '✔' if t.is_done else '' }}</span>{% endif %}
+      <div class="task-main">
+        <div class="task-t">{{ t.title }}
+          {% if t.priority == 'high' and not t.is_done %}<span class="pill crit">важно</span>{% endif %}</div>
+        <div class="task-sub">
+          {% if t.assignee %}👤 {{ t.assignee }}{% else %}<span class="muted">без исполнителя</span>{% endif %}
+          {% if t.due_on %} · срок {{ t.due_on|dt('%d.%m.%y') }}
+            {% if not t.is_done and t.days_left is not none %}
+              {% if t.days_left < 0 %}<span class="pill crit">просрочено на {{ -t.days_left }} дн.</span>
+              {% elif t.days_left == 0 %}<span class="pill warn">сегодня</span>
+              {% elif t.days_left <= 3 %}<span class="pill warn">через {{ t.days_left }} дн.</span>{% endif %}
+            {% endif %}
+          {% endif %}
+          {% if t.is_done %} · <span class="muted">выполнил {{ t.doneby or '—' }} {{ t.done_at|dt('%d.%m.%y') }}</span>{% endif %}
+        </div>
+      </div>
+      {% if can('tasks') %}
+      <form method="post" action="{{ url_for('task_delete', tid=t.id) }}" class="inline"
+            onsubmit="return confirm('Удалить задачу?')">
+        <button class="task-del" type="submit" title="Удалить">×</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="empty muted">Задач пока нет.</div>
+  {% endif %}
+  {% if can('tasks') %}
+  <form class="task-form" method="post" action="{{ url_for('task_add', cid=c.id) }}">
+    <input name="title" placeholder="Что нужно сделать…" maxlength="300" required>
+    <select name="assignee_id">
+      <option value="">— исполнитель —</option>
+      {% for u in team %}<option value="{{ u.id }}"{{ ' selected' if u.id == g.user.id }}>{{ u.full_name }}</option>{% endfor %}
+    </select>
+    <select name="priority">
+      <option value="normal">обычный</option>
+      <option value="high">высокий</option>
+      <option value="low">низкий</option>
+    </select>
+    <input type="date" name="due_on" title="Срок">
+    <button class="btn-sm" type="submit">Поставить</button>
+  </form>
+  {% endif %}
+</div>
+
 <div class="card" id="discuss">
   <div class="card-h"><h2>Обсуждение</h2><span class="badge">{{ comments|length }}</span></div>
   {% if comments %}

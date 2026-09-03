@@ -18,9 +18,30 @@
   </div>
 </div>
 
-{% set empty = not pays and not stg and not ending and not warr %}
+{% set empty = not pays and not stg and not ending and not warr and not tasks %}
 {% if empty %}
   <div class="card"><div class="empty muted">Ближайших сроков нет — всё под контролем.</div></div>
+{% endif %}
+
+{% if tasks %}
+<div class="card">
+  <div class="card-h"><h2>Задачи</h2><span class="badge warn">{{ tasks|length }}</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Срок</th><th>План</th><th>Задача</th><th>Договор</th><th>Исполнитель</th></tr></thead>
+    <tbody>
+      {% for r in tasks %}
+      <tr onclick="location='{{ url_for('contract', cid=r.cid) }}#tasks'"
+          class="{{ 'pay-overdue' if r.days_left is not none and r.days_left < 0 }}">
+        <td>{{ due(r.days_left, 3) }}</td>
+        <td class="mono">{{ r.due_on|dt('%d.%m.%y') }}</td>
+        <td>{{ r.title }}{% if r.priority == 'high' %} <span class="pill crit">важно</span>{% endif %}</td>
+        <td class="mono">{{ r.number_text }}</td>
+        <td>{{ r.assignee or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
 {% endif %}
 
 {% if show_pay and pays %}

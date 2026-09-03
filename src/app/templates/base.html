@@ -20,6 +20,10 @@
         Доска стадий <b>{{ nav.active if nav }}</b></a>
       <a href="{{ url_for('deadlines') }}" class="{{ 'on' if request.endpoint=='deadlines' }}">
         Сроки {% if nav and nav.deadlines %}<b class="hot">{{ nav.deadlines }}</b>{% endif %}</a>
+      {% if can('tasks') %}
+      <a href="{{ url_for('tasks_page') }}" class="{{ 'on' if request.endpoint=='tasks_page' }}">
+        Задачи {% if nav and nav.my_tasks %}<b class="{{ 'hot' if nav.my_tasks_over else '' }}">{{ nav.my_tasks }}</b>{% endif %}</a>
+      {% endif %}
       <a href="{{ url_for('warranty') }}" class="{{ 'on' if request.endpoint=='warranty' }}">
         Гарантии <b>{{ nav.warranty if nav }}</b></a>
       {% if can('create_contract') %}

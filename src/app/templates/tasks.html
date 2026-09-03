@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block crumb %}Задачи{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h"><h2>{{ rows|length }} задач</h2>
+    <div class="filters">
+      {% set fl = [('my','Мои открытые'),('overdue','Просроченные'),('all','Все открытые'),('done','Выполненные')] %}
+      {% for code, label in fl %}
+        {% if not (own_only and code in ('all','overdue')) %}
+        <a class="chip {{ 'on' if flt==code }}" href="{{ url_for('tasks_page', f=code) }}">{{ label }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% if rows %}
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th>Задача</th><th>Договор</th><th>Заказчик</th><th>Исполнитель</th><th>Срок</th></tr></thead>
+    <tbody>
+      {% for t in rows %}
+      <tr class="{{ 'task-done' if t.is_done }}">
+        <td>
+          <form method="post" action="{{ url_for('task_done', tid=t.id) }}" class="inline">
+            <input type="hidden" name="back" value="{{ url_for('tasks_page', f=flt) }}">
+            <button class="task-check" type="submit" title="{{ 'Вернуть' if t.is_done else 'Выполнено' }}">{{ '✔' if t.is_done else '' }}</button>
+          </form>
+        </td>
+        <td>{{ t.title }}{% if t.priority == 'high' and not t.is_done %} <span class="pill crit">важно</span>{% endif %}</td>
+        <td class="mono"><a class="who-link" href="{{ url_for('contract', cid=t.contract_id) }}">{{ t.number_text or '—' }}</a></td>
+        <td>{{ t.counterparty or '—' }}</td>
+        <td>{{ t.assignee or '—' }}</td>
+        <td class="mono">
+          {% if t.due_on %}{{ t.due_on|dt('%d.%m.%y') }}
+            {% if not t.is_done and t.days_left is not none and t.days_left < 0 %}<span class="pill crit">−{{ -t.days_left }}</span>
+            {% elif not t.is_done and t.days_left is not none and t.days_left <= 3 %}<span class="pill warn">{{ t.days_left }}</span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+    <div class="empty muted">Задач в этой выборке нет.</div>
+  {% endif %}
+</div>
+{% endblock %}

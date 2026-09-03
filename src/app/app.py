@@ -205,11 +205,15 @@ def inject_nav():
                AND stage NOT IN ('archived','cancelled')) AS ending_soon,
           (SELECT count(*) FROM payments p JOIN contracts c ON c.id=p.contract_id
              WHERE p.paid_on IS NULL AND p.planned_on IS NOT NULL AND p.planned_on < current_date
-               AND c.stage NOT IN ('archived','cancelled')) AS pay_over
-    """) or {}
+               AND c.stage NOT IN ('archived','cancelled')) AS pay_over,
+          (SELECT count(*) FROM tasks WHERE is_done=false AND assignee_id=%s) AS my_tasks,
+          (SELECT count(*) FROM tasks WHERE is_done=false AND assignee_id=%s
+             AND due_on IS NOT NULL AND due_on < current_date) AS my_tasks_over
+    """, (g.user["id"], g.user["id"])) or {}
     show_pay = g.get("perms", {}).get("payments", "none") != "none"
     counts = dict(counts)
     counts["deadlines"] = (counts.get("stages_over", 0) + counts.get("ending_soon", 0)
+                           + counts.get("my_tasks_over", 0)
                            + (counts.get("pay_over", 0) if show_pay else 0))
     return {"nav": counts}
 
@@ -388,8 +392,20 @@ def contract(cid: int):
         FROM comments cm LEFT JOIN users u ON u.id=cm.author_id
         WHERE cm.contract_id=%s ORDER BY cm.created_at
     """, (cid,))
+    tasks = db.query("""
+        SELECT t.id, t.title, t.due_on, t.priority, t.is_done, t.done_at,
+               (t.due_on - current_date) AS days_left,
+               a.full_name AS assignee, d.full_name AS doneby
+        FROM tasks t
+        LEFT JOIN users a ON a.id=t.assignee_id
+        LEFT JOIN users d ON d.id=t.done_by
+        WHERE t.contract_id=%s
+        ORDER BY t.is_done, t.due_on NULLS LAST, t.id
+    """, (cid,))
+    team = db.query("SELECT id, full_name FROM users WHERE is_active ORDER BY full_name")
     return render_template("contract.html", c=c, findings=findings, files=files,
-                           payments=payments, pay_sum=pay_sum, comments=comments)
+                           payments=payments, pay_sum=pay_sum, comments=comments,
+                           tasks=tasks, team=team)
 
 
 @app.route("/contract/<int:cid>/comment", methods=["POST"])
@@ -403,6 +419,103 @@ def comment_add(cid):
                    (cid, g.user["id"], body[:4000]))
         audit("comment", "contract", cid, after={"body": body[:200]})
     return redirect(url_for("contract", cid=cid) + "#discuss")
+
+
+# ------------------------------------------------------------------
+#  Задачи и поручения
+# ------------------------------------------------------------------
+
+PRIORITY_RU = {"low": "низкий", "normal": "обычный", "high": "высокий"}
+app.jinja_env.globals.update(PRIORITY_RU=PRIORITY_RU)
+
+
+@app.route("/contract/<int:cid>/task", methods=["POST"])
+@login_required
+def task_add(cid):
+    if not can("tasks"):
+        abort(403)
+    if not db.query_one("SELECT 1 FROM contracts WHERE id=%s", (cid,)):
+        abort(404)
+    title = (request.form.get("title") or "").strip()
+    if not title:
+        return redirect(url_for("contract", cid=cid) + "#tasks")
+    assignee = request.form.get("assignee_id") or None
+    due = request.form.get("due_on") or None
+    priority = request.form.get("priority") or "normal"
+    if priority not in PRIORITY_RU:
+        priority = "normal"
+    db.execute("""INSERT INTO tasks(contract_id, title, assignee_id, created_by, due_on, priority)
+                  VALUES(%s,%s,%s,%s,%s,%s)""",
+               (cid, title[:300], assignee, g.user["id"], due, priority))
+    audit("task_add", "contract", cid, after={"title": title[:200], "due_on": due})
+    return redirect(url_for("contract", cid=cid) + "#tasks")
+
+
+@app.route("/task/<int:tid>/done", methods=["POST"])
+@login_required
+def task_done(tid):
+    if not can("tasks"):
+        abort(403)
+    t = db.query_one("SELECT id, contract_id, is_done FROM tasks WHERE id=%s", (tid,))
+    if not t:
+        abort(404)
+    new_done = not t["is_done"]
+    db.execute("""UPDATE tasks SET is_done=%s,
+                    done_at = CASE WHEN %s THEN now() ELSE NULL END,
+                    done_by = CASE WHEN %s THEN %s ELSE NULL END
+                  WHERE id=%s""",
+               (new_done, new_done, new_done, g.user["id"], tid))
+    audit("task_done" if new_done else "task_reopen", "contract",
+          t["contract_id"], after={"task_id": tid})
+    back = request.form.get("back") or (url_for("contract", cid=t["contract_id"]) + "#tasks")
+    return redirect(back)
+
+
+@app.route("/task/<int:tid>/delete", methods=["POST"])
+@login_required
+def task_delete(tid):
+    if not can("tasks"):
+        abort(403)
+    t = db.query_one("SELECT id, contract_id FROM tasks WHERE id=%s", (tid,))
+    if not t:
+        abort(404)
+    db.execute("DELETE FROM tasks WHERE id=%s", (tid,))
+    audit("task_delete", "contract", t["contract_id"], after={"task_id": tid})
+    return redirect(url_for("contract", cid=t["contract_id"]) + "#tasks")
+
+
+@app.route("/tasks")
+@login_required
+def tasks_page():
+    if not can("tasks"):
+        abort(403)
+    flt = request.args.get("f", "my")
+    uid = g.user["id"]
+    own_only = perm_level("tasks") == "own"
+    where = "t.is_done = false"
+    params = []
+    if flt == "my" or own_only:
+        where += " AND t.assignee_id = %s"
+        params.append(uid)
+    elif flt == "overdue":
+        where += " AND t.due_on IS NOT NULL AND t.due_on < current_date"
+    elif flt == "done":
+        where = "t.is_done = true"
+        if own_only:
+            where += " AND t.assignee_id = %s"
+            params.append(uid)
+    rows = db.query(f"""
+        SELECT t.id, t.title, t.due_on, t.priority, t.is_done, t.contract_id,
+               (t.due_on - current_date) AS days_left,
+               a.full_name AS assignee, c.number_text, cp.name AS counterparty
+        FROM tasks t
+        LEFT JOIN users a ON a.id=t.assignee_id
+        LEFT JOIN contracts c ON c.id=t.contract_id
+        LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        WHERE {where}
+        ORDER BY t.is_done, t.due_on NULLS LAST, t.priority DESC, t.id
+    """, tuple(params))
+    return render_template("tasks.html", rows=rows, flt=flt, own_only=own_only)
 
 
 # ------------------------------------------------------------------
@@ -1206,8 +1319,26 @@ def deadlines():
           AND c.stage NOT IN ('archived','cancelled')
         ORDER BY s.planned_on
     """)
+    # задачи: незакрытые с подходящим или просроченным сроком (свои — приоритетно)
+    tasks = []
+    if can("tasks"):
+        mine = "AND t.assignee_id = %s" if perm_level("tasks") == "own" else ""
+        tparams = (g.user["id"],) if mine else ()
+        tasks = db.query(f"""
+            SELECT t.id, t.title, t.due_on, t.priority,
+                   (t.due_on - current_date) AS days_left,
+                   a.full_name AS assignee, c.id AS cid, c.number_text,
+                   cp.name AS counterparty
+            FROM tasks t
+            LEFT JOIN users a ON a.id=t.assignee_id
+            LEFT JOIN contracts c ON c.id=t.contract_id
+            LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+            WHERE t.is_done = false AND t.due_on IS NOT NULL
+              AND t.due_on <= current_date + 14 {mine}
+            ORDER BY t.due_on
+        """, tparams)
     return render_template("deadlines.html", pays=pays, warr=warr,
-                           ending=ending, stg=stg, show_pay=show_pay)
+                           ending=ending, stg=stg, tasks=tasks, show_pay=show_pay)
 
 
 def make_xlsx(sheet, headers, rows):
