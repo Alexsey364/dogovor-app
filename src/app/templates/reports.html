@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block crumb %}Отчёты{% endblock %}
+{% block body %}
+<div class="note">Отчёты выгружаются в Excel (.xlsx) — открываются в Excel, LibreOffice, Google Таблицах. Данные на момент выгрузки.</div>
+
+<div class="grid2">
+  <div class="card">
+    <div class="card-h"><h2>Реестр договоров</h2></div>
+    <div class="legend">Все договоры: номер, дата, заказчик, тип, объект, сумма, аванс, гарантия, стадия, число замечаний.</div>
+    <div class="form-foot" style="border:none"><a class="btn" href="{{ url_for('export_registry') }}">Выгрузить в Excel</a></div>
+  </div>
+  {% if perm_level('payments') != 'none' %}
+  <div class="card">
+    <div class="card-h"><h2>Платежи</h2></div>
+    <div class="legend">График платежей: плановая дата, договор, заказчик, тип, направление, сумма, отметка оплаты.</div>
+    <div class="form-foot" style="border:none"><a class="btn" href="{{ url_for('export_payments') }}">Выгрузить в Excel</a></div>
+  </div>
+  {% endif %}
+  <div class="card">
+    <div class="card-h"><h2>Гарантийные обязательства</h2></div>
+    <div class="legend">Объекты на гарантии: срок, дата ввода, дата окончания гарантии, заказчик, объект.</div>
+    <div class="form-foot" style="border:none"><a class="btn" href="{{ url_for('export_warranty') }}">Выгрузить в Excel</a></div>
+  </div>
+</div>
+{% endblock %}

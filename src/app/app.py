@@ -1056,6 +1056,118 @@ def contract_history(cid):
     return render_template("history.html", rows=rows, c=c, cid=cid)
 
 
+def make_xlsx(sheet, headers, rows):
+    import io as _io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet[:31]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="1F5F73")
+        cell.alignment = Alignment(vertical="center")
+    ws.freeze_panes = "A2"
+    for r in rows:
+        ws.append(r)
+    from openpyxl.utils import get_column_letter
+    for i, h in enumerate(headers, 1):
+        maxlen = len(str(h))
+        for r in rows:
+            v = r[i - 1] if i - 1 < len(r) else ""
+            maxlen = max(maxlen, len(str(v)) if v is not None else 0)
+        ws.column_dimensions[get_column_letter(i)].width = min(48, max(10, maxlen + 2))
+    bio = _io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    return bio
+
+
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@app.route("/reports")
+@login_required
+def reports():
+    if not can("reports"):
+        abort(403)
+    return render_template("reports.html")
+
+
+@app.route("/export/registry.xlsx")
+@login_required
+def export_registry():
+    if not can("reports"):
+        abort(403)
+    rows = db.query("""
+        SELECT c.number_text, c.signed_on, cp.name, ct.name AS type_name, o.address,
+               c.amount, c.advance_pct, c.warranty_months, c.stage,
+               (SELECT count(*) FROM review_findings rf WHERE rf.contract_id=c.id AND rf.resolution IS NULL) AS f
+        FROM contracts c
+        LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        LEFT JOIN contract_types ct ON ct.code=c.type_code
+        LEFT JOIN objects o ON o.id=c.object_id
+        ORDER BY c.number_text
+    """)
+    data = [[r["number_text"], r["signed_on"], r["name"], r["type_name"], r["address"],
+             float(r["amount"]) if r["amount"] else None,
+             float(r["advance_pct"]) if r["advance_pct"] else None,
+             r["warranty_months"], STAGE_RU.get(r["stage"], r["stage"]), r["f"]]
+            for r in rows]
+    bio = make_xlsx("Реестр договоров",
+                    ["Номер", "Дата", "Заказчик", "Тип", "Объект", "Сумма",
+                     "Аванс %", "Гарантия мес", "Стадия", "Замечаний"], data)
+    audit("export", "report", 0, after={"report": "registry"})
+    return send_file(bio, as_attachment=True, download_name="reestr.xlsx", mimetype=XLSX_MIME)
+
+
+@app.route("/export/payments.xlsx")
+@login_required
+def export_payments():
+    if perm_level("payments") == "none" or not can("reports"):
+        abort(403)
+    rows = db.query("""
+        SELECT p.planned_on, c.number_text, cp.name, p.kind, p.direction,
+               p.amount, p.paid_on, p.paid_amount, p.condition
+        FROM payments p JOIN contracts c ON c.id=p.contract_id
+        LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        ORDER BY p.planned_on NULLS LAST
+    """)
+    data = [[r["planned_on"], r["number_text"], r["name"], PAY_KIND_RU.get(r["kind"], r["kind"]),
+             DIR_RU.get(r["direction"], r["direction"]),
+             float(r["amount"]) if r["amount"] else None, r["paid_on"],
+             float(r["paid_amount"]) if r["paid_amount"] else None, r["condition"]]
+            for r in rows]
+    bio = make_xlsx("Платежи", ["Плановая дата", "Договор", "Заказчик", "Тип",
+                                "Направление", "Сумма", "Оплачен", "Оплачено", "Условие"], data)
+    audit("export", "report", 0, after={"report": "payments"})
+    return send_file(bio, as_attachment=True, download_name="platezhi.xlsx", mimetype=XLSX_MIME)
+
+
+@app.route("/export/warranty.xlsx")
+@login_required
+def export_warranty():
+    if not can("reports"):
+        abort(403)
+    rows = db.query("""
+        SELECT c.number_text, cp.name, o.address, c.warranty_months,
+               c.commissioning_date, c.warranty_until, ct.name AS type_name
+        FROM contracts c
+        LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        LEFT JOIN objects o ON o.id=c.object_id
+        LEFT JOIN contract_types ct ON ct.code=c.type_code
+        WHERE c.warranty_months IS NOT NULL
+        ORDER BY c.warranty_until NULLS LAST, c.number_text
+    """)
+    data = [[r["number_text"], r["name"], r["address"], r["warranty_months"],
+             r["commissioning_date"], r["warranty_until"], r["type_name"]] for r in rows]
+    bio = make_xlsx("Гарантии", ["Договор", "Заказчик", "Объект", "Гарантия мес",
+                                 "Дата ввода", "Действует до", "Тип"], data)
+    audit("export", "report", 0, after={"report": "warranty"})
+    return send_file(bio, as_attachment=True, download_name="garantii.xlsx", mimetype=XLSX_MIME)
+
+
 @app.route("/health")
 def health():
     try:
