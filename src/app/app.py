@@ -1015,15 +1015,21 @@ def search():
             SELECT c.id, c.number_text, c.subject, c.amount, c.stage, c.signed_on,
                    cp.name AS counterparty, o.address AS object,
                    (SELECT count(*) FROM review_findings rf
-                     WHERE rf.contract_id=c.id AND rf.resolution IS NULL) AS findings
+                     WHERE rf.contract_id=c.id AND rf.resolution IS NULL) AS findings,
+                   EXISTS (SELECT 1 FROM contract_files cf
+                     WHERE cf.contract_id=c.id
+                       AND cf.text_search @@ plainto_tsquery('russian', %s)) AS in_text
             FROM contracts c
             LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
             LEFT JOIN objects o ON o.id=c.object_id
             WHERE c.number_text ILIKE %s OR c.subject ILIKE %s
                OR cp.name ILIKE %s OR o.address ILIKE %s
                OR c.external_number ILIKE %s
+               OR EXISTS (SELECT 1 FROM contract_files cf
+                     WHERE cf.contract_id=c.id
+                       AND cf.text_search @@ plainto_tsquery('russian', %s))
             ORDER BY c.number_text DESC LIMIT 100
-        """, (like, like, like, like, like))
+        """, (q, like, like, like, like, like, q))
     return render_template("search.html", q=q, rows=rows)
 
 

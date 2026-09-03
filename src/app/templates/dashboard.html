@@ -2,6 +2,15 @@
 {% block crumb %}Мой день{% endblock %}
 {% block body %}
 
+<div class="hero">
+  <div>
+    <div class="hero-hi">Здравствуйте, {{ g.user.full_name.split(' ')[0] }}</div>
+    <div class="hero-sub">{{ today.strftime('%d.%m.%Y') }} · в работе {{ stats.active }} договоров
+      {% if sev.crit %}· <b class="hero-crit">{{ sev.crit }} критических замечаний ждут решения</b>{% else %}· критических замечаний нет{% endif %}</div>
+  </div>
+  {% if can('create_contract') %}<a class="btn" href="{{ url_for('contract_new') }}">+ Новый договор</a>{% endif %}
+</div>
+
 <div class="stats">
   <div class="stat s-acc"><div class="v">{{ stats.total }}</div><div class="l">договоров всего</div></div>
   <div class="stat s-acc"><div class="v">{{ stats.active }}</div><div class="l">в работе и действующих</div></div>

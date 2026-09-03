@@ -11,7 +11,7 @@
       <tr onclick="location='{{ url_for('contract', cid=r.id) }}'">
         <td class="mono">{{ r.number_text }}</td>
         <td class="mono">{{ r.signed_on|dt('%d.%m.%y') }}</td>
-        <td>{{ r.counterparty or '—' }}</td>
+        <td>{{ r.counterparty or '—' }}{% if r.in_text %} <span class="pill">в тексте</span>{% endif %}</td>
         <td class="muted">{{ (r.object or '—')|truncate(30) }}</td>
         <td class="mono">{{ r.amount|money }}</td>
         <td>{% if r.findings %}<span class="pill crit">{{ r.findings }}</span>{% else %}<span class="pill ok">чисто</span>{% endif %}</td>

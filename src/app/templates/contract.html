@@ -49,9 +49,11 @@
       <form method="post" action="{{ url_for('contract_review', cid=c.id) }}" class="inline">
         <button class="btn-sm" type="submit" title="Проверка по набору правил">Проверить (правила)</button>
       </form>
+      {% if can('review_decide') %}
       <form method="post" action="{{ url_for('contract_ai_review', cid=c.id) }}" class="inline">
         <button class="btn-sm ai" type="submit" title="Умный разбор текста договора">Умная проверка ИИ</button>
       </form>
+      {% endif %}
     </div>
   </div>
   {% if findings %}

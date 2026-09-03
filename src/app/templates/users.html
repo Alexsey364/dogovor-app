@@ -3,7 +3,7 @@
 {% block body %}
 <div class="card">
   <div class="card-h"><h2>{{ rows|length }} учётных записей</h2>
-    {% if g.user.role_code == 'admin' %}<a class="btn-sm" href="{{ url_for('user_new') }}">+ Добавить</a>{% endif %}
+    {% if can('manage_users') %}<a class="btn-sm" href="{{ url_for('user_new') }}">+ Добавить</a>{% endif %}
   </div>
   <div class="tablewrap"><table>
     <thead><tr><th>Сотрудник</th><th>Логин</th><th>Роль</th><th>Отдел</th><th>Последний вход</th><th>Статус</th></tr></thead>

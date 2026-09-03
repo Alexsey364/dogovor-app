@@ -311,3 +311,92 @@ tbody tr:last-child td{border-bottom:none}
 .rel-v{font-size:30px;font-weight:700;color:var(--ok)}
 .rel-l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .crit-num{color:var(--crit)}
+
+/* ============================================================
+   ВИЗУАЛЬНОЕ ОБНОВЛЕНИЕ — больше цвета и жизни
+   ============================================================ */
+:root{
+  --info:#2563A6; --info-soft:#DCE9F6;
+  --violet:#6B4E9E; --violet-soft:#E8E0F3;
+  --grad-a:#1F5F73; --grad-b:#2C8299;
+}
+@media (prefers-color-scheme:dark){:root{
+  --info:#6FB0E8; --info-soft:#1A2E44;
+  --violet:#B69BE0; --violet-soft:#2A2140;
+  --grad-a:#173E4A; --grad-b:#1F5F73;
+}}
+
+/* бренд в шапке — акцентная плашка */
+.brand{padding:14px 18px;margin:-16px 0 6px;
+  background:linear-gradient(135deg,var(--grad-a),var(--grad-b))}
+.brand a{color:#fff}
+.brand span{color:rgba(255,255,255,.75)}
+
+/* активный пункт меню — ярче */
+.nav a.on{background:linear-gradient(90deg,var(--accent-soft),transparent)}
+
+/* карточки — цветная полоска сверху при наведении и мягче тень */
+.card{transition:box-shadow .15s, transform .15s}
+.card:hover{box-shadow:0 2px 6px rgba(22,34,46,.08),0 10px 26px rgba(22,34,46,.09)}
+
+/* статистика — крупнее, с мягким тоном */
+.stat{position:relative;overflow:hidden}
+.stat .v{font-size:30px;letter-spacing:-.01em}
+.stat.s-acc{background:linear-gradient(135deg,var(--accent-soft),transparent 70%)}
+.stat.s-ok{background:linear-gradient(135deg,var(--ok-soft),transparent 70%)}
+.stat.s-crit{background:linear-gradient(135deg,var(--crit-soft),transparent 70%)}
+.stat.s-warn{background:linear-gradient(135deg,var(--warn-soft),transparent 70%)}
+.stat{border-left-width:4px}
+
+/* стадии — у каждой свой цвет */
+.pill.stage-draft{background:var(--surface-2);color:var(--muted)}
+.pill.stage-internal_review{background:var(--info-soft);color:var(--info);border:none}
+.pill.stage-legal_review{background:var(--violet-soft);color:var(--violet);border:none}
+.pill.stage-at_counterparty{background:var(--warn-soft);color:var(--warn);border:none}
+.pill.stage-in_progress{background:var(--accent-soft);color:var(--accent-ink);border:none}
+.pill.stage-completed{background:var(--ok-soft);color:var(--ok);border:none}
+.pill.stage-warranty{background:var(--ok-soft);color:var(--ok);border:none}
+.pill.stage-archived{background:var(--surface-2);color:var(--muted)}
+.pill.stage-cancelled{background:var(--crit-soft);color:var(--crit);border:none}
+.pill.stage-on_hold{background:var(--warn-soft);color:var(--warn);border:none}
+.tk.stage-internal_review{border-left-color:var(--info)}
+.tk.stage-legal_review{border-left-color:var(--violet)}
+.tk.stage-at_counterparty{border-left-color:var(--warn)}
+.tk.stage-warranty{border-left-color:var(--ok)}
+
+/* заголовки карточек — тонкая акцентная линия слева */
+.card-h{border-left:3px solid transparent}
+.card-h h2{position:relative}
+
+/* кнопки — чуть объёмнее */
+.btn,.btn-sm{box-shadow:0 1px 2px rgba(31,95,115,.25)}
+.btn:hover,.btn-sm:hover{transform:translateY(-1px)}
+
+/* пилюли надёжности/статуса — насыщеннее */
+.pill.ok{font-weight:700}
+.badge.crit{box-shadow:0 0 0 3px var(--crit-soft)}
+
+/* строки-замечания на сводке — акцентная заливка слева */
+.find-row.sev-critical{background:linear-gradient(90deg,var(--crit-soft),transparent 55%)}
+.find-row.sev-warning{background:linear-gradient(90deg,var(--warn-soft),transparent 55%)}
+
+/* конвейер стадий — цветные плитки */
+.pl-step{border-top:3px solid var(--accent)}
+.pl-step .pl-n{color:var(--accent-ink)}
+
+/* мягкое появление */
+@media (prefers-reduced-motion:no-preference){
+  .card{animation:rise .2s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+}
+
+/* приветственная шапка «Мой день» */
+.hero{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding:20px 22px;border-radius:12px;color:#fff;
+  background:linear-gradient(120deg,var(--grad-a),var(--grad-b));
+  box-shadow:0 6px 20px rgba(31,95,115,.25)}
+.hero-hi{font-size:22px;font-weight:700;font-family:"Segoe UI",system-ui}
+.hero-sub{font-size:13.5px;color:rgba(255,255,255,.85);margin-top:4px}
+.hero-crit{color:#FFD9D4}
+.hero .btn{background:#fff;color:var(--accent-ink);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.hero .btn:hover{background:#fff;filter:none}
