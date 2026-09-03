@@ -24,8 +24,9 @@
     <div class="fact"><div class="k">Гарантия</div><div class="v">{{ (c.warranty_months|string ~ ' мес.') if c.warranty_months else '—' }}</div></div>
     <div class="fact"><div class="k">Гарантия до</div><div class="v mono">{{ c.warranty_until|dt if c.warranty_until else 'нет даты ввода' }}</div></div>
   </div>
-  {% if g.user.role_code in ('manager','lawyer','admin') %}
+  {% if can('change_stage') or can('edit_contract') or can('view_journal') %}
   <div class="doc-actions">
+    {% if can('change_stage') %}
     <form method="post" action="{{ url_for('contract_stage', cid=c.id) }}" class="inline">
       <label class="mut-label">Стадия:</label>
       <select name="stage">
@@ -33,8 +34,9 @@
       </select>
       <button class="btn-sm" type="submit">Сменить</button>
     </form>
-    <a class="btn-ghost" href="{{ url_for('contract_edit', cid=c.id) }}">Редактировать</a>
-    <a class="btn-ghost" href="{{ url_for('contract_history', cid=c.id) }}">История</a>
+    {% endif %}
+    {% if can('edit_contract') %}<a class="btn-ghost" href="{{ url_for('contract_edit', cid=c.id) }}">Редактировать</a>{% endif %}
+    {% if can('view_journal') %}<a class="btn-ghost" href="{{ url_for('contract_history', cid=c.id) }}">История</a>{% endif %}
   </div>
   {% endif %}
 </div>
@@ -111,7 +113,7 @@
     <div class="empty muted">Файлы ещё не загружены.</div>
   {% endif %}
 
-  {% if can('edit_contract') %}
+  {% if can('manage_files') %}
   <form method="post" action="{{ url_for('contract_upload', cid=c.id) }}"
         enctype="multipart/form-data" class="upload-row">
     <select name="kind">
@@ -188,6 +190,53 @@
 </div>
 {% endif %}
 
+<div class="card">
+  <div class="card-h"><h2>Этапы работ
+    {% if work_stages %}<span class="badge">{{ work_stages|selectattr('is_done')|list|length }} из {{ work_stages|length }}</span>{% endif %}</h2>
+  </div>
+  {% if work_stages %}
+  <div class="tablewrap"><table>
+    <thead><tr><th>Этап</th><th>Объём</th><th>План</th><th>Факт</th><th>Сумма</th><th>Статус</th><th></th></tr></thead>
+    <tbody>
+      {% for s in work_stages %}
+      <tr class="{{ 'done-row' if s.is_done }}">
+        <td>{{ s.name }}</td>
+        <td class="muted">{{ s.volume or '—' }}</td>
+        <td class="mono">{{ s.planned_on|dt('%d.%m.%y') if s.planned_on else '—' }}</td>
+        <td class="mono">{{ s.actual_on|dt('%d.%m.%y') if s.actual_on else '—' }}</td>
+        <td class="mono">{{ s.amount|money }}</td>
+        <td>{% if s.is_done %}<span class="pill ok">закрыт</span>{% else %}<span class="pill">в работе</span>{% endif %}</td>
+        <td>
+          {% if can('execution') %}
+          <form method="post" action="{{ url_for('work_stage_done', sid=s.id) }}" class="inline">
+            <button class="mini {{ '' if s.is_done else 'ok' }}" type="submit">{{ 'открыть' if s.is_done else 'закрыть' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('work_stage_delete', sid=s.id) }}" class="inline" onsubmit="return confirm('Удалить этап?')">
+            <button class="mini" type="submit">×</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+    <div class="empty muted">Этапы работ не заданы.</div>
+  {% endif %}
+  {% if can('execution') %}
+  <details class="pay-add" style="padding:12px 16px;border-top:1px solid var(--line-soft)">
+    <summary class="btn-sm">+ Этап работ</summary>
+    <form method="post" action="{{ url_for('work_stage_add', cid=c.id) }}" class="form" style="padding-top:12px">
+      <label class="wide">Название этапа<input name="name" required placeholder="например: Этап 1 — центральный район, 14 узлов"></label>
+      <label>Объём<input name="volume" placeholder="14 узлов"></label>
+      <label>Плановый срок<input type="date" name="planned_on"></label>
+      <label>Сумма этапа, ₽<input type="number" step="0.01" name="amount"></label>
+      <div class="form-foot"><button class="btn-sm" type="submit">Добавить этап</button></div>
+    </form>
+  </details>
+  {% endif %}
+</div>
+
 <div class="grid2">
   <div class="card">
     <div class="card-h"><h2>Исполнение</h2></div>
@@ -195,7 +244,7 @@
     <div class="kv"><b>Дата окончания работ</b><span class="mono">{{ c.completed_on|dt if c.completed_on else '—' }}</span></div>
     <div class="kv"><b>Дата ввода в эксплуатацию</b><span class="mono">{{ c.commissioning_date|dt if c.commissioning_date else '—' }}</span></div>
     <div class="kv"><b>Гарантия действует до</b><span class="mono">{{ c.warranty_until|dt if c.warranty_until else 'нужна дата ввода' }}</span></div>
-    {% if can('edit_contract') %}
+    {% if can('execution') %}
     <form method="post" action="{{ url_for('contract_execution', cid=c.id) }}" class="exec-form">
       <label>Окончание работ<input type="date" name="completed_on" value="{{ c.completed_on|dt('%Y-%m-%d') if c.completed_on else '' }}"></label>
       <label>Ввод в эксплуатацию<input type="date" name="commissioning_date" value="{{ c.commissioning_date|dt('%Y-%m-%d') if c.commissioning_date else '' }}"></label>

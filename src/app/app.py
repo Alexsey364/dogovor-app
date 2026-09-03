@@ -353,6 +353,10 @@ def contract(cid: int):
         WHERE cf.contract_id=%s
         ORDER BY cf.kind, cf.version DESC, cf.id DESC
     """, (cid,))
+    work_stages = db.query("""
+        SELECT id, ord, name, volume, planned_on, actual_on, amount, is_done
+        FROM stages WHERE contract_id=%s ORDER BY ord, id
+    """, (cid,))
     payments = []
     pay_sum = {}
     if perm_level("payments") != "none":
@@ -795,7 +799,7 @@ def contract_ai_review(cid):
 @app.route("/contract/<int:cid>/stage", methods=["POST"])
 @login_required
 def contract_stage(cid):
-    if not can("edit_contract"):
+    if not can("change_stage"):
         abort(403)
     new_stage = request.form.get("stage")
     if new_stage not in STAGES:
@@ -842,7 +846,7 @@ def contract_edit(cid):
 @app.route("/contract/<int:cid>/execution", methods=["POST"])
 @login_required
 def contract_execution(cid):
-    if not can("edit_contract"):
+    if not can("execution"):
         abort(403)
     comm = request.form.get("commissioning_date") or None
     comp = request.form.get("completed_on") or None
@@ -853,6 +857,58 @@ def contract_execution(cid):
           after={"commissioning": comm, "completed": comp})
     flash("Даты исполнения сохранены")
     return redirect(url_for("contract", cid=cid))
+
+
+@app.route("/contract/<int:cid>/work-stage", methods=["POST"])
+@login_required
+def work_stage_add(cid):
+    if not can("execution") and not can("edit_contract"):
+        abort(403)
+    name = (request.form.get("name") or "").strip()
+    volume = (request.form.get("volume") or "").strip() or None
+    planned = request.form.get("planned_on") or None
+    amount = request.form.get("amount") or None
+    if not name:
+        flash("Укажите название этапа")
+        return redirect(url_for("contract", cid=cid))
+    ordn = (db.query_one("SELECT coalesce(max(ord),0)+1 AS o FROM stages WHERE contract_id=%s",
+                         (cid,)) or {"o": 1})["o"]
+    db.execute("INSERT INTO stages(contract_id, ord, name, volume, planned_on, amount) "
+               "VALUES(%s,%s,%s,%s,%s,%s)", (cid, ordn, name, volume, planned, amount))
+    audit("stage_add", "contract", cid, after={"name": name})
+    flash("Этап работ добавлен")
+    return redirect(url_for("contract", cid=cid))
+
+
+@app.route("/work-stage/<int:sid>/done", methods=["POST"])
+@login_required
+def work_stage_done(sid):
+    if not can("execution") and not can("edit_contract"):
+        abort(403)
+    s = db.query_one("SELECT contract_id, is_done FROM stages WHERE id=%s", (sid,))
+    if not s:
+        abort(404)
+    if s["is_done"]:
+        db.execute("UPDATE stages SET is_done=false, actual_on=NULL WHERE id=%s", (sid,))
+    else:
+        actual = request.form.get("actual_on") or None
+        db.execute("UPDATE stages SET is_done=true, actual_on=coalesce(%s, current_date) WHERE id=%s",
+                   (actual, sid))
+    audit("stage_done", "contract", s["contract_id"], after={"stage": sid})
+    return redirect(url_for("contract", cid=s["contract_id"]))
+
+
+@app.route("/work-stage/<int:sid>/delete", methods=["POST"])
+@login_required
+def work_stage_delete(sid):
+    if not can("execution") and not can("edit_contract"):
+        abort(403)
+    s = db.query_one("SELECT contract_id FROM stages WHERE id=%s", (sid,))
+    if s:
+        db.execute("DELETE FROM stages WHERE id=%s", (sid,))
+        audit("stage_del", "contract", s["contract_id"])
+        return redirect(url_for("contract", cid=s["contract_id"]))
+    abort(404)
 
 
 @app.route("/finding/<int:fid>/resolve", methods=["POST"])
@@ -900,7 +956,7 @@ def search():
 @app.route("/contract/<int:cid>/upload", methods=["POST"])
 @login_required
 def contract_upload(cid):
-    if not can("edit_contract"):
+    if not can("manage_files"):
         abort(403)
     c = db.query_one("SELECT id FROM contracts WHERE id=%s", (cid,))
     if not c:
