@@ -282,8 +282,19 @@
     <div class="empty muted">Пока нет сообщений. Оставьте заметку для коллег — она сохранится в журнале.</div>
   {% endif %}
   <form class="cmt-form" method="post" action="{{ url_for('comment_add', cid=c.id) }}">
-    <textarea name="body" rows="2" maxlength="4000" placeholder="Заметка, вопрос или договорённость по этому договору…" required></textarea>
-    <button class="btn" type="submit">Добавить</button>
+    <textarea name="body" rows="4" maxlength="4000" placeholder="Заметка, вопрос или договорённость по этому договору…" required></textarea>
+    <div class="cmt-form-foot">
+      <span class="muted">Enter — перенос строки, Ctrl+Enter — отправить</span>
+      <button class="btn" type="submit">Добавить</button>
+    </div>
   </form>
 </div>
+<script>
+  (function(){
+    var t = document.querySelector('.cmt-form textarea');
+    if(t) t.addEventListener('keydown', function(e){
+      if((e.ctrlKey||e.metaKey) && e.key === 'Enter') this.form.submit();
+    });
+  })();
+</script>
 {% endblock %}

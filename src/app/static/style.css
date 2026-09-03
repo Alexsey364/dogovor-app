@@ -406,10 +406,14 @@ tbody tr:last-child td{border-bottom:none}
 .cmt{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2,rgba(0,0,0,.02))}
 .cmt-h{display:flex;align-items:baseline;gap:8px;font-size:12.5px;margin-bottom:4px}
 .cmt-b{white-space:pre-wrap;line-height:1.45;font-size:14px}
-.cmt-form{display:flex;gap:8px;align-items:flex-start}
-.cmt-form textarea{flex:1;resize:vertical;min-height:44px;font:inherit;padding:9px 11px;
-  border:1px solid var(--line);border-radius:9px;background:var(--field,#fff);color:inherit}
+.cmt-form{display:flex;flex-direction:column;gap:10px}
+.cmt-form textarea{display:block;width:100%;box-sizing:border-box;resize:vertical;
+  min-height:96px;font:inherit;font-size:14.5px;line-height:1.5;padding:12px 14px;
+  border:1px solid var(--line);border-radius:10px;background:var(--field,#fff);color:inherit}
 .cmt-form textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.cmt-form-foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cmt-form-foot .muted{font-size:12px}
+.cmt-form-foot .btn{flex:0 0 auto;padding:9px 22px}
 
 /* напоминание о сроках на дашборде */
 .remind{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:13px 16px;border-radius:11px;
