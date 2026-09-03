@@ -284,7 +284,6 @@
   <form class="cmt-form" method="post" action="{{ url_for('comment_add', cid=c.id) }}">
     <textarea name="body" rows="4" maxlength="4000" placeholder="Заметка, вопрос или договорённость по этому договору…" required></textarea>
     <div class="cmt-form-foot">
-      <span class="muted">Enter — перенос строки, Ctrl+Enter — отправить</span>
       <button class="btn" type="submit">Добавить</button>
     </div>
   </form>

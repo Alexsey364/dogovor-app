@@ -411,8 +411,7 @@ tbody tr:last-child td{border-bottom:none}
   min-height:96px;font:inherit;font-size:14.5px;line-height:1.5;padding:12px 14px;
   border:1px solid var(--line);border-radius:10px;background:var(--field,#fff);color:inherit}
 .cmt-form textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
-.cmt-form-foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.cmt-form-foot .muted{font-size:12px}
+.cmt-form-foot{display:flex;align-items:center;justify-content:flex-end;gap:12px}
 .cmt-form-foot .btn{flex:0 0 auto;padding:9px 22px}
 
 /* напоминание о сроках на дашборде */
