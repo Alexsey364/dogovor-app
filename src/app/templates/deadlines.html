@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block crumb %}Сроки{% endblock %}
+{% block body %}
+
+{# срок в виде плашки: отрицательные дни — просрочка, малые — скоро #}
+{% macro due(days, warn=7) %}
+  {% if days is none %}<span class="pill">—</span>
+  {% elif days < 0 %}<span class="pill crit">просрочено на {{ -days }} дн.</span>
+  {% elif days == 0 %}<span class="pill crit">сегодня</span>
+  {% elif days <= warn %}<span class="pill warn">через {{ days }} дн.</span>
+  {% else %}<span class="pill">через {{ days }} дн.</span>{% endif %}
+{% endmacro %}
+
+<div class="hero">
+  <div>
+    <div class="hero-hi">Сроки и напоминания</div>
+    <div class="hero-sub">{{ today.strftime('%d.%m.%Y') }} · что требует внимания в ближайшие недели</div>
+  </div>
+</div>
+
+{% set empty = not pays and not stg and not ending and not warr %}
+{% if empty %}
+  <div class="card"><div class="empty muted">Ближайших сроков нет — всё под контролем.</div></div>
+{% endif %}
+
+{% if show_pay and pays %}
+<div class="card">
+  <div class="card-h"><h2>Платежи</h2><span class="badge warn">{{ pays|length }}</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Срок</th><th>Дата</th><th>Договор</th><th>Заказчик</th><th>Тип</th><th>Сумма</th></tr></thead>
+    <tbody>
+      {% for r in pays %}
+      <tr onclick="location='{{ url_for('contract', cid=r.cid) }}'"
+          class="{{ 'pay-overdue' if r.days_left is not none and r.days_left < 0 }}">
+        <td>{{ due(r.days_left) }}</td>
+        <td class="mono">{{ r.planned_on|dt('%d.%m.%y') }}</td>
+        <td class="mono">{{ r.number_text }}</td>
+        <td>{{ r.counterparty or '—' }}</td>
+        <td class="muted">{{ PAY_KIND_RU.get(r.kind, r.kind) }} · {{ DIR_RU.get(r.direction, r.direction) }}</td>
+        <td class="mono">{{ r.amount|money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+
+{% if stg %}
+<div class="card">
+  <div class="card-h"><h2>Этапы работ</h2><span class="badge warn">{{ stg|length }}</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Срок</th><th>План</th><th>Договор</th><th>Заказчик</th><th>Этап</th><th>Объём</th></tr></thead>
+    <tbody>
+      {% for r in stg %}
+      <tr onclick="location='{{ url_for('contract', cid=r.cid) }}'"
+          class="{{ 'pay-overdue' if r.days_left is not none and r.days_left < 0 }}">
+        <td>{{ due(r.days_left) }}</td>
+        <td class="mono">{{ r.planned_on|dt('%d.%m.%y') }}</td>
+        <td class="mono">{{ r.number_text }}</td>
+        <td>{{ r.counterparty or '—' }}</td>
+        <td>{{ r.name }}</td>
+        <td class="muted">{{ r.volume or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+
+{% if ending %}
+<div class="card">
+  <div class="card-h"><h2>Срок действия истекает</h2><span class="badge warn">{{ ending|length }}</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Срок</th><th>Действует до</th><th>Договор</th><th>Заказчик</th><th>Автопролонгация</th></tr></thead>
+    <tbody>
+      {% for r in ending %}
+      <tr onclick="location='{{ url_for('contract', cid=r.cid) }}'"
+          class="{{ 'pay-overdue' if r.days_left is not none and r.days_left < 0 }}">
+        <td>{{ due(r.days_left, 14) }}</td>
+        <td class="mono">{{ r.valid_to|dt('%d.%m.%y') }}</td>
+        <td class="mono">{{ r.number_text }}</td>
+        <td>{{ r.counterparty or '—' }}</td>
+        <td>
+          {% if r.auto_renewal %}<span class="pill">продлевается автоматически{% if r.renewal_notice_days %}, отказ за {{ r.renewal_notice_days }} дн.{% endif %}</span>
+          {% else %}<span class="muted">нет</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+
+{% if warr %}
+<div class="card">
+  <div class="card-h"><h2>Гарантии на исходе</h2><span class="badge">{{ warr|length }}</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Срок</th><th>Действует до</th><th>Договор</th><th>Заказчик</th><th>Объект</th></tr></thead>
+    <tbody>
+      {% for r in warr %}
+      <tr onclick="location='{{ url_for('contract', cid=r.cid) }}'">
+        <td>{% if r.days_left is not none and r.days_left < 0 %}<span class="pill muted">истекла {{ -r.days_left }} дн. назад</span>{% else %}{{ due(r.days_left, 30) }}{% endif %}</td>
+        <td class="mono">{{ r.warranty_until|dt('%d.%m.%y') }}</td>
+        <td class="mono">{{ r.number_text }}</td>
+        <td>{{ r.counterparty or '—' }}</td>
+        <td class="muted">{{ (r.object_address or '—')|truncate(34) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+
+{% endblock %}

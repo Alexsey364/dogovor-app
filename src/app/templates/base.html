@@ -18,6 +18,8 @@
         Мой день {% if nav and nav.findings %}<b class="hot">{{ nav.findings }}</b>{% endif %}</a>
       <a href="{{ url_for('board') }}" class="{{ 'on' if request.endpoint=='board' }}">
         Доска стадий <b>{{ nav.active if nav }}</b></a>
+      <a href="{{ url_for('deadlines') }}" class="{{ 'on' if request.endpoint=='deadlines' }}">
+        Сроки {% if nav and nav.deadlines %}<b class="hot">{{ nav.deadlines }}</b>{% endif %}</a>
       <a href="{{ url_for('warranty') }}" class="{{ 'on' if request.endpoint=='warranty' }}">
         Гарантии <b>{{ nav.warranty if nav }}</b></a>
       {% if can('create_contract') %}

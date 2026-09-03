@@ -265,4 +265,25 @@
     <div class="kv"><b>Изменён</b><span class="mono muted">{{ c.updated_at|dt('%d.%m.%y %H:%M') if c.updated_at else '—' }}</span></div>
   </div>
 </div>
+
+<div class="card" id="discuss">
+  <div class="card-h"><h2>Обсуждение</h2><span class="badge">{{ comments|length }}</span></div>
+  {% if comments %}
+  <div class="comments">
+    {% for m in comments %}
+    <div class="cmt">
+      <div class="cmt-h"><b>{{ m.author or 'без автора' }}</b>
+        <span class="muted mono">{{ m.created_at|dt('%d.%m.%y %H:%M') }}</span></div>
+      <div class="cmt-b">{{ m.body }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="empty muted">Пока нет сообщений. Оставьте заметку для коллег — она сохранится в журнале.</div>
+  {% endif %}
+  <form class="cmt-form" method="post" action="{{ url_for('comment_add', cid=c.id) }}">
+    <textarea name="body" rows="2" maxlength="4000" placeholder="Заметка, вопрос или договорённость по этому договору…" required></textarea>
+    <button class="btn" type="submit">Добавить</button>
+  </form>
+</div>
 {% endblock %}

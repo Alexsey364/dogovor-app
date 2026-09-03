@@ -11,6 +11,16 @@
   {% if can('create_contract') %}<a class="btn" href="{{ url_for('contract_new') }}">+ Новый договор</a>{% endif %}
 </div>
 
+{% if nav and nav.deadlines %}
+<div class="remind">
+  <span class="rk">⏰ Сроки:</span>
+  {% if nav.pay_over and perm_level('payments') != 'none' %}<span>{{ nav.pay_over }} просроченных платежей</span>{% endif %}
+  {% if nav.stages_over %}<span>{{ nav.stages_over }} просроченных этапов</span>{% endif %}
+  {% if nav.ending_soon %}<span>{{ nav.ending_soon }} договоров скоро истекают</span>{% endif %}
+  <a href="{{ url_for('deadlines') }}">Открыть сроки →</a>
+</div>
+{% endif %}
+
 <div class="stats">
   <div class="stat s-acc"><div class="v">{{ stats.total }}</div><div class="l">договоров всего</div></div>
   <div class="stat s-acc"><div class="v">{{ stats.active }}</div><div class="l">в работе и действующих</div></div>

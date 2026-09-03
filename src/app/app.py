@@ -196,8 +196,21 @@ def inject_nav():
           (SELECT count(*) FROM review_findings WHERE resolution IS NULL) AS findings,
           (SELECT count(*) FROM counterparties) AS counterparties,
           (SELECT count(*) FROM contracts WHERE warranty_months IS NOT NULL) AS warranty,
-          (SELECT count(*) FROM users) AS users
+          (SELECT count(*) FROM users) AS users,
+          (SELECT count(*) FROM stages s JOIN contracts c ON c.id=s.contract_id
+             WHERE s.is_done=false AND s.planned_on IS NOT NULL AND s.planned_on < current_date
+               AND c.stage NOT IN ('archived','cancelled')) AS stages_over,
+          (SELECT count(*) FROM contracts
+             WHERE valid_to IS NOT NULL AND valid_to BETWEEN current_date AND current_date + 30
+               AND stage NOT IN ('archived','cancelled')) AS ending_soon,
+          (SELECT count(*) FROM payments p JOIN contracts c ON c.id=p.contract_id
+             WHERE p.paid_on IS NULL AND p.planned_on IS NOT NULL AND p.planned_on < current_date
+               AND c.stage NOT IN ('archived','cancelled')) AS pay_over
     """) or {}
+    show_pay = g.get("perms", {}).get("payments", "none") != "none"
+    counts = dict(counts)
+    counts["deadlines"] = (counts.get("stages_over", 0) + counts.get("ending_soon", 0)
+                           + (counts.get("pay_over", 0) if show_pay else 0))
     return {"nav": counts}
 
 
@@ -370,8 +383,26 @@ def contract(cid: int):
                    coalesce(sum(paid_amount) FILTER (WHERE paid_on IS NOT NULL),0) AS paid
             FROM payments WHERE contract_id=%s AND direction='incoming'
         """, (cid,)) or {}
+    comments = db.query("""
+        SELECT cm.id, cm.body, cm.created_at, u.full_name AS author
+        FROM comments cm LEFT JOIN users u ON u.id=cm.author_id
+        WHERE cm.contract_id=%s ORDER BY cm.created_at
+    """, (cid,))
     return render_template("contract.html", c=c, findings=findings, files=files,
-                           payments=payments, pay_sum=pay_sum)
+                           payments=payments, pay_sum=pay_sum, comments=comments)
+
+
+@app.route("/contract/<int:cid>/comment", methods=["POST"])
+@login_required
+def comment_add(cid):
+    if not db.query_one("SELECT 1 FROM contracts WHERE id=%s", (cid,)):
+        abort(404)
+    body = (request.form.get("body") or "").strip()
+    if body:
+        db.execute("INSERT INTO comments(contract_id, author_id, body) VALUES(%s,%s,%s)",
+                   (cid, g.user["id"], body[:4000]))
+        audit("comment", "contract", cid, after={"body": body[:200]})
+    return redirect(url_for("contract", cid=cid) + "#discuss")
 
 
 # ------------------------------------------------------------------
@@ -1114,6 +1145,69 @@ def contract_history(cid):
     """, (cid,))
     c = db.query_one("SELECT number_text FROM contracts WHERE id=%s", (cid,))
     return render_template("history.html", rows=rows, c=c, cid=cid)
+
+
+# ------------------------------------------------------------------
+#  Сроки и напоминания
+# ------------------------------------------------------------------
+
+@app.route("/deadlines")
+@login_required
+def deadlines():
+    show_pay = perm_level("payments") != "none"
+    # неоплаченные платежи: просроченные и ближайшие (≤ 14 дней)
+    pays = []
+    if show_pay:
+        pays = db.query("""
+            SELECT p.id, p.kind, p.direction, p.planned_on, p.amount, p.condition,
+                   (p.planned_on - current_date) AS days_left,
+                   c.id AS cid, c.number_text, cp.name AS counterparty
+            FROM payments p JOIN contracts c ON c.id=p.contract_id
+            LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+            WHERE p.paid_on IS NULL AND p.planned_on IS NOT NULL
+              AND p.planned_on <= current_date + 14
+              AND c.stage NOT IN ('archived','cancelled')
+            ORDER BY p.planned_on
+        """)
+    # гарантии на исходе (≤ 60 дней) и недавно истёкшие (последние 30 дней)
+    warr = db.query("""
+        SELECT c.id AS cid, c.number_text, c.warranty_until,
+               (c.warranty_until - current_date) AS days_left,
+               cp.name AS counterparty, o.address AS object_address
+        FROM contracts c
+        LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        LEFT JOIN objects o ON o.id=c.object_id
+        WHERE c.warranty_until IS NOT NULL
+          AND c.warranty_until BETWEEN current_date - 30 AND current_date + 60
+        ORDER BY c.warranty_until
+    """)
+    # срок действия договора истекает (≤ 30 дней) — важно для автопролонгации
+    ending = db.query("""
+        SELECT c.id AS cid, c.number_text, c.valid_to, c.auto_renewal,
+               c.renewal_notice_days,
+               (c.valid_to - current_date) AS days_left,
+               cp.name AS counterparty
+        FROM contracts c
+        LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        WHERE c.valid_to IS NOT NULL
+          AND c.valid_to BETWEEN current_date AND current_date + 45
+          AND c.stage NOT IN ('archived','cancelled')
+        ORDER BY c.valid_to
+    """)
+    # этапы работ: не сделаны, плановая дата просрочена или близко (≤ 14 дней)
+    stg = db.query("""
+        SELECT s.id, s.name, s.volume, s.planned_on, s.amount,
+               (s.planned_on - current_date) AS days_left,
+               c.id AS cid, c.number_text, cp.name AS counterparty
+        FROM stages s JOIN contracts c ON c.id=s.contract_id
+        LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        WHERE s.is_done = false AND s.planned_on IS NOT NULL
+          AND s.planned_on <= current_date + 14
+          AND c.stage NOT IN ('archived','cancelled')
+        ORDER BY s.planned_on
+    """)
+    return render_template("deadlines.html", pays=pays, warr=warr,
+                           ending=ending, stg=stg, show_pay=show_pay)
 
 
 def make_xlsx(sheet, headers, rows):
