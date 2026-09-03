@@ -59,7 +59,7 @@
       <div class="find-body">
         <div class="ft">{{ f.title }}{% if f.clause %} <span class="clause">{{ f.clause }}</span>{% endif %}</div>
         {% if f.detail %}<div class="fd">{{ f.detail }}</div>{% endif %}
-        {% if g.user.role_code in ('lawyer','admin') %}
+        {% if can('review_decide') %}
         <div class="find-act">
           {% if f.resolution %}
             <span class="tag {{ 'ok' if f.resolution=='accepted' else 'mut' }}">{{ 'учтено' if f.resolution=='accepted' else 'отклонено' }}</span>
