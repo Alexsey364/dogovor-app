@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block crumb %}Поиск{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h"><h2>{% if q %}Найдено: {{ rows|length }}{% else %}Поиск{% endif %}</h2></div>
+  {% if q and rows %}
+  <div class="tablewrap"><table>
+    <thead><tr><th>Номер</th><th>Дата</th><th>Заказчик</th><th>Объект</th><th>Сумма</th><th>Замеч.</th><th>Стадия</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr onclick="location='{{ url_for('contract', cid=r.id) }}'">
+        <td class="mono">{{ r.number_text }}</td>
+        <td class="mono">{{ r.signed_on|dt('%d.%m.%y') }}</td>
+        <td>{{ r.counterparty or '—' }}</td>
+        <td class="muted">{{ (r.object or '—')|truncate(30) }}</td>
+        <td class="mono">{{ r.amount|money }}</td>
+        <td>{% if r.findings %}<span class="pill crit">{{ r.findings }}</span>{% else %}<span class="pill ok">чисто</span>{% endif %}</td>
+        <td><span class="pill stage-{{ r.stage }}">{{ STAGE_RU[r.stage] }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% elif q %}
+    <div class="empty muted">По запросу «{{ q }}» ничего не найдено.</div>
+  {% else %}
+    <div class="empty muted">Введите номер, заказчика, адрес или слово из предмета договора.</div>
+  {% endif %}
+</div>
+{% endblock %}

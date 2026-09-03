@@ -41,6 +41,9 @@
   <div class="main">
     <header class="top">
       <div class="crumb">{% block crumb %}{% endblock %}</div>
+      <form class="topsearch" method="get" action="{{ url_for('search') }}">
+        <input name="q" placeholder="Поиск: номер, заказчик, адрес, текст…" value="{{ request.args.get('q','') }}">
+      </form>
       <div class="who">
         <a class="who-link" href="{{ url_for('change_password') }}">{{ g.user.full_name }} · {{ g.user.role_name }}</a>
         <a class="btn-ghost" href="{{ url_for('logout') }}">Выйти</a>

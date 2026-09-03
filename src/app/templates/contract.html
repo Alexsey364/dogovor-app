@@ -23,29 +23,61 @@
     <div class="fact"><div class="k">Гарантия</div><div class="v">{{ (c.warranty_months|string ~ ' мес.') if c.warranty_months else '—' }}</div></div>
     <div class="fact"><div class="k">Гарантия до</div><div class="v mono">{{ c.warranty_until|dt if c.warranty_until else 'нет даты ввода' }}</div></div>
   </div>
+  {% if g.user.role_code in ('manager','lawyer','admin') %}
+  <div class="doc-actions">
+    <form method="post" action="{{ url_for('contract_stage', cid=c.id) }}" class="inline">
+      <select name="stage">
+        {% for s in STAGE_ORDER %}<option value="{{ s }}" {{ 'selected' if s==c.stage }}>{{ STAGE_RU[s] }}</option>{% endfor %}
+      </select>
+      <button class="btn-sm" type="submit">Сменить стадию</button>
+    </form>
+    <a class="btn-ghost" href="{{ url_for('contract_edit', cid=c.id) }}">Редактировать</a>
+    <a class="btn-ghost" href="{{ url_for('contract_history', cid=c.id) }}">История</a>
+  </div>
+  {% endif %}
 </div>
 
 <div class="card">
   <div class="card-h"><h2>Проверка договора</h2>
-    <div style="display:flex;align-items:center;gap:10px">
-      {% if findings %}<span class="badge crit">{{ findings|selectattr('severity','equalto','critical')|list|length }} крит.</span>{% else %}<span class="badge ok">чисто</span>{% endif %}
-      <form method="post" action="{{ url_for('contract_review', cid=c.id) }}" style="margin:0">
+    <div class="row-gap">
+      {% set open_crit = findings|selectattr('resolution','none')|selectattr('severity','equalto','critical')|list|length %}
+      {% if open_crit %}<span class="badge crit">{{ open_crit }} крит.</span>{% else %}<span class="badge ok">чисто</span>{% endif %}
+      <form method="post" action="{{ url_for('contract_review', cid=c.id) }}" class="inline">
         <button class="btn-sm" type="submit">Проверить</button>
       </form>
     </div>
   </div>
   {% if findings %}
     {% for f in findings %}
-    <div class="find sev-{{ f.severity }}">
+    <div class="find sev-{{ f.severity }} {{ 'resolved' if f.resolution }}">
       <div class="find-sev">{{ SEV_RU[f.severity] }}</div>
       <div class="find-body">
         <div class="ft">{{ f.title }}{% if f.clause %} <span class="clause">{{ f.clause }}</span>{% endif %}</div>
         {% if f.detail %}<div class="fd">{{ f.detail }}</div>{% endif %}
+        {% if g.user.role_code in ('lawyer','admin') %}
+        <div class="find-act">
+          {% if f.resolution %}
+            <span class="tag {{ 'ok' if f.resolution=='accepted' else 'mut' }}">{{ 'учтено' if f.resolution=='accepted' else 'отклонено' }}</span>
+            <form method="post" action="{{ url_for('finding_resolve', fid=f.id) }}" class="inline">
+              <input type="hidden" name="decision" value="reopen"><button class="mini" type="submit">вернуть</button>
+            </form>
+          {% else %}
+            <form method="post" action="{{ url_for('finding_resolve', fid=f.id) }}" class="inline">
+              <input type="hidden" name="decision" value="accepted"><button class="mini ok" type="submit">Учтено</button>
+            </form>
+            <form method="post" action="{{ url_for('finding_resolve', fid=f.id) }}" class="inline">
+              <input type="hidden" name="decision" value="rejected"><button class="mini" type="submit">Отклонить</button>
+            </form>
+          {% endif %}
+        </div>
+        {% elif f.resolution %}
+          <div class="find-act"><span class="tag {{ 'ok' if f.resolution=='accepted' else 'mut' }}">{{ 'учтено' if f.resolution=='accepted' else 'отклонено' }}</span></div>
+        {% endif %}
       </div>
     </div>
     {% endfor %}
   {% else %}
-    <div class="empty muted">Замечаний при проверке не найдено.</div>
+    <div class="empty muted">Замечаний при проверке не найдено. Нажмите «Проверить», чтобы прогнать заново.</div>
   {% endif %}
 </div>
 
@@ -55,14 +87,14 @@
     <div class="kv"><b>Стадия</b><span>{{ STAGE_RU[c.stage] }}</span></div>
     <div class="kv"><b>Ответственный</b><span class="muted">не назначен</span></div>
     <div class="kv"><b>Акты и КС</b><span class="muted">будут здесь</span></div>
-    <div class="legend">Этапы работ, акты сдачи и КС-2/КС-3 появятся на этом месте — следующий блок разработки.</div>
+    <div class="legend">Этапы работ, акты сдачи и КС-2/КС-3 — следующий блок разработки.</div>
   </div>
   <div class="card">
     <div class="card-h"><h2>Документы</h2></div>
     <div class="kv"><b>Папка на сервере</b><span class="muted">{{ c.folder_path or 'не привязана' }}</span></div>
     <div class="kv"><b>Внешний номер</b><span class="mono">{{ c.external_number or '—' }}</span></div>
     <div class="kv"><b>ИКЗ</b><span class="mono">{{ c.ikz or '—' }}</span></div>
-    <div class="legend">Оригиналы договора, сметы и приложений останутся в папке на сервере; система хранит ссылку.</div>
+    <div class="legend">Оригиналы договора и приложений останутся в папке на сервере; система хранит ссылку.</div>
   </div>
 </div>
 {% endblock %}

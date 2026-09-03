@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ url_for('contract', cid=cid) }}">{{ c.number_text }}</a> · история{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h"><h2>История договора {{ c.number_text }}</h2></div>
+  {% if rows %}
+  <div class="tablewrap"><table>
+    <thead><tr><th>Когда</th><th>Кто</th><th>Действие</th><th>Подробности</th></tr></thead>
+    <tbody>
+      {% set A = {'create':'создан','edit':'изменён','stage':'смена стадии','review':'проверка','finding':'решение по замечанию'} %}
+      {% for r in rows %}
+      <tr>
+        <td class="mono">{{ r.at|dt('%d.%m.%y %H:%M') }}</td>
+        <td>{{ r.full_name or 'система' }}</td>
+        <td>{{ A.get(r.action, r.action) }}</td>
+        <td class="muted mono">{{ (r.after or '')|truncate(50) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+    <div class="empty muted">Записей пока нет.</div>
+  {% endif %}
+  <div class="legend">Журнал только пополняется — записи нельзя удалить или изменить, включая администратора.</div>
+</div>
+{% endblock %}

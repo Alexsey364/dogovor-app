@@ -38,7 +38,10 @@ SEV_RU = {"critical": "критично", "warning": "предупреждени
 KIND_RU = {"commercial": "коммерческий", "budget": "бюджет", "uk_tsj": "УК/ТСЖ",
            "government": "госконтракт", "individual": "физлицо/ИП"}
 
-app.jinja_env.globals.update(STAGE_RU=STAGE_RU, SEV_RU=SEV_RU, KIND_RU=KIND_RU)
+app.jinja_env.globals.update(STAGE_RU=STAGE_RU, SEV_RU=SEV_RU, KIND_RU=KIND_RU,
+                             STAGE_ORDER=["draft", "internal_review", "legal_review",
+                                          "at_counterparty", "in_progress", "completed",
+                                          "warranty", "archived", "cancelled", "on_hold"])
 
 
 @app.template_filter("money")
@@ -92,6 +95,22 @@ def load_user():
 
 
 CAN_CREATE = ("manager", "lawyer", "admin")
+CAN_EDIT = ("manager", "lawyer", "admin")
+
+
+def audit(action: str, entity: str, entity_id: int, before=None, after=None):
+    """Запись в журнал действий (не удаляется и не правится триггерами)."""
+    import json
+    try:
+        db.execute(
+            "INSERT INTO audit_log(user_id, action, entity, entity_id, before, after, ip) "
+            "VALUES(%s,%s,%s,%s,%s,%s,%s)",
+            (g.user["id"] if g.get("user") else None, action, entity, entity_id,
+             json.dumps(before, ensure_ascii=False, default=str) if before else None,
+             json.dumps(after, ensure_ascii=False, default=str) if after else None,
+             request.remote_addr))
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def next_number() -> str:
@@ -442,6 +461,7 @@ def contract_new():
                 (num, type_code, cp_id, obj_id, subject, amount or None, advance_pct or None,
                  advance_amount, warranty or None, has_penalty, g.user["id"]))["id"]
             n = review_engine.run(cid)
+            audit("create", "contract", cid, after={"number": num})
             flash(f"Договор {num} создан. Проверка нашла замечаний: {n}")
             return redirect(url_for("contract", cid=cid))
     return render_template("contract_new.html", types=types, cps=cps, next_num=next_number())
@@ -451,11 +471,108 @@ def contract_new():
 @login_required
 def contract_review(cid):
     n = review_engine.run(cid)
-    if n:
-        flash(f"Проверка добавила замечаний: {n}")
-    else:
-        flash("Проверка завершена, новых замечаний нет")
+    audit("review", "contract", cid, after={"added": n})
+    flash(f"Проверка добавила замечаний: {n}" if n else "Проверка завершена, новых замечаний нет")
     return redirect(url_for("contract", cid=cid))
+
+
+STAGES = ["draft", "internal_review", "legal_review", "at_counterparty",
+          "in_progress", "completed", "warranty", "archived", "cancelled", "on_hold"]
+
+
+@app.route("/contract/<int:cid>/stage", methods=["POST"])
+@login_required
+def contract_stage(cid):
+    if g.user["role_code"] not in CAN_EDIT:
+        abort(403)
+    new_stage = request.form.get("stage")
+    if new_stage not in STAGES:
+        abort(400)
+    old = db.query_one("SELECT stage FROM contracts WHERE id=%s", (cid,))
+    db.execute("UPDATE contracts SET stage=%s, updated_at=now() WHERE id=%s", (new_stage, cid))
+    audit("stage", "contract", cid, before=old, after={"stage": new_stage})
+    flash(f"Стадия изменена: {STAGE_RU.get(new_stage, new_stage)}")
+    return redirect(url_for("contract", cid=cid))
+
+
+@app.route("/contract/<int:cid>/edit", methods=["GET", "POST"])
+@login_required
+def contract_edit(cid):
+    if g.user["role_code"] not in CAN_EDIT:
+        abort(403)
+    c = db.query_one("SELECT * FROM contracts WHERE id=%s", (cid,))
+    if not c:
+        abort(404)
+    types = db.query("SELECT code, name FROM contract_types ORDER BY name")
+    if request.method == "POST":
+        f = request.form
+        amount = f.get("amount") or None
+        adv = f.get("advance_pct") or None
+        advance_amount = round(float(amount) * float(adv) / 100, 2) if (amount and adv) else None
+        db.execute("""
+            UPDATE contracts SET subject=%s, amount=%s, advance_pct=%s, advance_amount=%s,
+                warranty_months=%s, commissioning_date=%s, signed_on=%s,
+                has_penalty=%s, updated_at=now() WHERE id=%s""",
+            (f.get("subject"), amount, adv, advance_amount,
+             f.get("warranty_months") or None, f.get("commissioning_date") or None,
+             f.get("signed_on") or None, f.get("has_penalty") == "on", cid))
+        audit("edit", "contract", cid)
+        flash("Договор сохранён")
+        return redirect(url_for("contract", cid=cid))
+    return render_template("contract_edit.html", c=c, types=types)
+
+
+@app.route("/finding/<int:fid>/resolve", methods=["POST"])
+@login_required
+def finding_resolve(fid):
+    decision = request.form.get("decision")  # accepted | rejected | reopen
+    f = db.query_one("SELECT contract_id FROM review_findings WHERE id=%s", (fid,))
+    if not f:
+        abort(404)
+    if decision == "reopen":
+        db.execute("UPDATE review_findings SET resolution=NULL, resolved_by=NULL, "
+                   "resolved_at=NULL WHERE id=%s", (fid,))
+    elif decision in ("accepted", "rejected"):
+        db.execute("UPDATE review_findings SET resolution=%s, resolved_by=%s, resolved_at=now() "
+                   "WHERE id=%s", (decision, g.user["id"], fid))
+    audit("finding", "review_finding", fid, after={"decision": decision})
+    return redirect(url_for("contract", cid=f["contract_id"]))
+
+
+@app.route("/search")
+@login_required
+def search():
+    q = (request.args.get("q") or "").strip()
+    rows = []
+    if q:
+        like = f"%{q}%"
+        rows = db.query("""
+            SELECT c.id, c.number_text, c.subject, c.amount, c.stage, c.signed_on,
+                   cp.name AS counterparty, o.address AS object,
+                   (SELECT count(*) FROM review_findings rf
+                     WHERE rf.contract_id=c.id AND rf.resolution IS NULL) AS findings
+            FROM contracts c
+            LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+            LEFT JOIN objects o ON o.id=c.object_id
+            WHERE c.number_text ILIKE %s OR c.subject ILIKE %s
+               OR cp.name ILIKE %s OR o.address ILIKE %s
+               OR c.external_number ILIKE %s
+            ORDER BY c.number_text DESC LIMIT 100
+        """, (like, like, like, like, like))
+    return render_template("search.html", q=q, rows=rows)
+
+
+@app.route("/contract/<int:cid>/history")
+@login_required
+def contract_history(cid):
+    rows = db.query("""
+        SELECT a.at, a.action, a.before, a.after, u.full_name
+        FROM audit_log a LEFT JOIN users u ON u.id=a.user_id
+        WHERE a.entity='contract' AND a.entity_id=%s
+        ORDER BY a.at DESC LIMIT 100
+    """, (cid,))
+    c = db.query_one("SELECT number_text FROM contracts WHERE id=%s", (cid,))
+    return render_template("history.html", rows=rows, c=c, cid=cid)
 
 
 @app.route("/health")

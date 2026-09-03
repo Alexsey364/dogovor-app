@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ url_for('contract', cid=c.id) }}">{{ c.number_text }}</a> · редактирование{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h"><h2>Редактирование {{ c.number_text }}</h2></div>
+  <form method="post" class="form">
+    <label class="wide">Предмет договора<input name="subject" value="{{ c.subject or '' }}" required></label>
+    <label>Сумма, ₽<input name="amount" type="number" step="0.01" value="{{ c.amount or '' }}"></label>
+    <label>Аванс, %<input name="advance_pct" type="number" step="1" min="0" max="100" value="{{ (c.advance_pct|round|int) if c.advance_pct else '' }}"></label>
+    <label>Гарантия, мес.<input name="warranty_months" type="number" step="1" min="0" value="{{ c.warranty_months or '' }}"></label>
+    <label>Дата ввода в эксплуатацию<input name="commissioning_date" type="date" value="{{ c.commissioning_date|dt('%Y-%m-%d') if c.commissioning_date else '' }}">
+      <span class="hint">От неё считается конец гарантии</span></label>
+    <label>Дата подписания<input name="signed_on" type="date" value="{{ c.signed_on|dt('%Y-%m-%d') if c.signed_on else '' }}"></label>
+    <label class="check"><input type="checkbox" name="has_penalty" {{ 'checked' if c.has_penalty }}> Есть неустойка за просрочку оплаты</label>
+    <div class="form-foot">
+      <button class="btn" type="submit">Сохранить</button>
+      <a class="btn-ghost" href="{{ url_for('contract', cid=c.id) }}">Отмена</a>
+      <span class="muted">После сохранения запустите «Проверить» на карточке</span>
+    </div>
+  </form>
+</div>
+{% endblock %}
