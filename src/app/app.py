@@ -63,8 +63,44 @@ def human_size(n):
     return f"{n:.1f} ГБ"
 
 
+from markupsafe import Markup
+
+_ICONS = {
+    "home": '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+    "board": '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/>',
+    "clock": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    "task": '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/>',
+    "shield": '<path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/>',
+    "plus": '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    "list": '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+    "users": '<circle cx="9" cy="8" r="3.4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16.5 5.2a3.4 3.4 0 010 6.6M21 20c0-2.4-1.4-4.5-3.5-5.4"/>',
+    "chart": '<path d="M4 20h16"/><rect x="5" y="12" width="3.2" height="6" rx="1"/><rect x="10.4" y="7" width="3.2" height="11" rx="1"/><rect x="15.8" y="9.5" width="3.2" height="8.5" rx="1"/>',
+    "pay": '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>',
+    "user": '<circle cx="12" cy="8" r="4"/><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/>',
+    "key": '<circle cx="8" cy="8" r="4"/><path d="M11 11l9 9M17 17l2-2M19 15l2-2"/>',
+    "award": '<circle cx="12" cy="9" r="5"/><path d="M9 13l-2 8 5-3 5 3-2-8"/>',
+    "rules": '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
+    "doc": '<path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4"/>',
+    "alert": '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>',
+    "ruble": '<circle cx="12" cy="12" r="9"/><path d="M9 8h4a2.5 2.5 0 010 5H9v-5m0 5v4m-1 0h5m-6-2h4"/>',
+    "flag": '<path d="M5 21V4h11l-2 4 2 4H5"/>',
+    "wallet": '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12h3"/>',
+}
+
+
+def ic(name):
+    return Markup(f'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'
+                  f'{_ICONS.get(name, "")}</svg>')
+
+
+def ictile(name):
+    """Иконка в цветной плитке — для бокового меню."""
+    return Markup(f'<span class="tile t-{name}"><svg class="ic" viewBox="0 0 24 24" '
+                  f'aria-hidden="true">{_ICONS.get(name, "")}</svg></span>')
+
+
 app.jinja_env.globals.update(FILE_KIND_RU=FILE_KIND_RU, FILE_KINDS=FILE_KINDS,
-                             human_size=human_size)
+                             human_size=human_size, ic=ic, ictile=ictile)
 app.jinja_env.globals.update(STAGE_RU=STAGE_RU, SEV_RU=SEV_RU, KIND_RU=KIND_RU,
                              STAGE_ORDER=["draft", "internal_review", "legal_review",
                                           "at_counterparty", "in_progress", "completed",
@@ -1078,6 +1114,31 @@ def contract_stage(cid):
           after={"stage": new_stage, "from": STAGE_RU.get(old["stage"] if old else "", "")})
     flash(f"Стадия изменена: {STAGE_RU.get(new_stage, new_stage)}")
     return redirect(url_for("contract", cid=cid))
+
+
+@app.route("/contract/<int:cid>/move", methods=["POST"])
+@login_required
+def contract_move(cid):
+    """Перетаскивание карточки на доске: смена стадии через AJAX + журнал."""
+    if not can("change_stage"):
+        return {"ok": False, "error": "Нет права менять стадию"}, 403
+    new_stage = request.form.get("stage")
+    if new_stage not in STAGES:
+        return {"ok": False, "error": "Неизвестная стадия"}, 400
+    old = db.query_one("SELECT stage FROM contracts WHERE id=%s", (cid,))
+    if not old:
+        return {"ok": False, "error": "Договор не найден"}, 404
+    if old["stage"] == new_stage:
+        return {"ok": True, "stage": new_stage, "unchanged": True}
+    db.execute("UPDATE contracts SET stage=%s, stage_since=now(), updated_at=now() WHERE id=%s",
+               (new_stage, cid))
+    audit("stage_move", "contract", cid, before={"stage": old["stage"]},
+          after={"stage": new_stage, "from_ru": STAGE_RU.get(old["stage"], ""),
+                 "to_ru": STAGE_RU.get(new_stage, "")})
+    import datetime
+    return {"ok": True, "stage": new_stage,
+            "since": datetime.date.today().strftime("%d.%m.%y"),
+            "by": g.user["full_name"]}
 
 
 @app.route("/contract/<int:cid>/edit", methods=["GET", "POST"])

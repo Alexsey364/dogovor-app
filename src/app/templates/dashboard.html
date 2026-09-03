@@ -21,13 +21,18 @@
 </div>
 {% endif %}
 
-<div class="stats">
-  <div class="stat s-acc"><div class="v">{{ stats.total }}</div><div class="l">договоров всего</div></div>
-  <div class="stat s-acc"><div class="v">{{ stats.active }}</div><div class="l">в работе и действующих</div></div>
-  <div class="stat s-crit"><div class="v">{{ sev.crit }}</div><div class="l">критических замечаний</div></div>
-  <div class="stat s-warn"><div class="v">{{ sev.warn }}</div><div class="l">предупреждений</div></div>
+<div class="kpis">
+  <div class="kpi"><span class="badge b-acc">{{ ic('doc') }}</span>
+    <div><div class="v">{{ stats.total }}</div><div class="l">договоров всего</div></div></div>
+  <div class="kpi"><span class="badge b-info">{{ ic('flag') }}</span>
+    <div><div class="v">{{ stats.active }}</div><div class="l">в работе и действующих</div></div></div>
+  <a class="kpi k-crit" href="{{ url_for('registry', f='findings') }}"><span class="badge b-crit">{{ ic('alert') }}</span>
+    <div><div class="v">{{ sev.crit }}</div><div class="l">критических замечаний</div></div></a>
+  <div class="kpi k-warn"><span class="badge b-warn">{{ ic('alert') }}</span>
+    <div><div class="v">{{ sev.warn }}</div><div class="l">предупреждений</div></div></div>
   {% if g.user.role_code == 'admin' %}
-  <div class="stat s-ok"><div class="v mono">{{ stats.total_amount|money }}</div><div class="l">на сумму</div></div>
+  <div class="kpi k-ok"><span class="badge b-ok">{{ ic('ruble') }}</span>
+    <div><div class="v mono" style="font-size:22px">{{ stats.total_amount|money }}</div><div class="l">на сумму</div></div></div>
   {% endif %}
 </div>
 
@@ -68,13 +73,15 @@
 </div>
 
 <div class="card">
-  <div class="card-h"><h2>Движение по стадиям</h2><a class="link" href="{{ url_for('board') }}">доска →</a></div>
-  <div class="pipeline">
+  <div class="card-h"><h2>Портфель по стадиям</h2><a class="link" href="{{ url_for('board') }}">на доску →</a></div>
+  {% set mx = (by_stage.values()|max) if by_stage else 1 %}
+  <div class="bars">
     {% for s in stage_order %}
       {% if by_stage.get(s) %}
-      <a class="pl-step" href="{{ url_for('board') }}">
-        <div class="pl-n">{{ by_stage.get(s) }}</div>
-        <div class="pl-l">{{ STAGE_RU[s] }}</div>
+      <a class="bar" href="{{ url_for('board') }}">
+        <span class="bl">{{ STAGE_RU[s] }}</span>
+        <span class="track"><span class="fill stage-{{ s }}" style="width:{{ (by_stage.get(s)/mx*100)|round|int }}%"></span></span>
+        <span class="bn">{{ by_stage.get(s) }}</span>
       </a>
       {% endif %}
     {% endfor %}

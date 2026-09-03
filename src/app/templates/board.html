@@ -1,25 +1,28 @@
 {% extends "base.html" %}
 {% block crumb %}Доска стадий{% endblock %}
 {% block body %}
+{% set can_move = can('change_stage') %}
 <div class="card">
   <div class="card-h"><h2>Стадии</h2>
-    <div class="row-gap"><span class="muted" style="font-size:12.5px">в колонках новые сверху (по дате смены стадии)</span>
+    <div class="row-gap"><span class="muted" style="font-size:12.5px">
+      {% if can_move %}перетащите карточку в другой столбец — стадия сменится и запишется в журнал{% else %}новые сверху (по дате смены стадии){% endif %}</span>
       <button class="btn-sm" type="button" id="allcols">Показать все</button></div>
   </div>
   <div class="colfilter" id="colfilter">
     {% for s in stage_order %}
     <label class="colchip"><input type="checkbox" data-stage="{{ s }}" checked> {{ STAGE_RU[s] }}
-      <span class="cc">{{ cols[s]|length }}</span></label>
+      <span class="cc" data-cc="{{ s }}">{{ cols[s]|length }}</span></label>
     {% endfor %}
   </div>
 </div>
 
-<div class="board" id="board">
+<div class="board" id="board" data-canmove="{{ '1' if can_move else '0' }}">
   {% for s in stage_order %}
   <div class="col" data-stage="{{ s }}">
-    <div class="col-h"><span class="t">{{ STAGE_RU[s] }}</span><span class="c">{{ cols[s]|length }}</span></div>
+    <div class="col-h"><span class="t">{{ STAGE_RU[s] }}</span><span class="c" data-count="{{ s }}">{{ cols[s]|length }}</span></div>
     {% for r in cols[s] %}
-    <a class="tk stage-{{ s }}" href="{{ url_for('contract', cid=r.id) }}">
+    <a class="tk stage-{{ s }}" href="{{ url_for('contract', cid=r.id) }}"
+       {% if can_move %}draggable="true" data-cid="{{ r.id }}" data-move="{{ url_for('contract_move', cid=r.id) }}"{% endif %}>
       <span class="num">{{ r.number_text }}</span>
       <span class="ttl">{{ r.counterparty or '—' }}</span>
       <span class="meta">
@@ -27,20 +30,21 @@
         {% if r.crit %}<span class="pill crit">{{ r.crit }}</span>{% endif %}
       </span>
     </a>
-    {% else %}
-    <div class="col-empty">пусто</div>
     {% endfor %}
+    <div class="col-empty"{% if cols[s]|length %} hidden{% endif %}>пусто</div>
   </div>
   {% endfor %}
 </div>
 
+<div id="toast" class="toast" hidden></div>
+
 <script>
 (function(){
+  /* ---- фильтр колонок (localStorage) ---- */
   var KEY = 'board_hidden_stages';
   var hidden = {};
   try { hidden = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e){}
-
-  function apply(){
+  function applyFilter(){
     document.querySelectorAll('#board .col').forEach(function(col){
       col.hidden = !!hidden[col.dataset.stage];
     });
@@ -50,18 +54,92 @@
   }
   document.querySelectorAll('#colfilter input').forEach(function(cb){
     cb.addEventListener('change', function(){
-      if (cb.checked) delete hidden[cb.dataset.stage];
-      else hidden[cb.dataset.stage] = 1;
+      if (cb.checked) delete hidden[cb.dataset.stage]; else hidden[cb.dataset.stage] = 1;
       try { localStorage.setItem(KEY, JSON.stringify(hidden)); } catch(e){}
-      apply();
+      applyFilter();
     });
   });
   document.getElementById('allcols').addEventListener('click', function(){
-    hidden = {};
-    try { localStorage.setItem(KEY, '{}'); } catch(e){}
-    apply();
+    hidden = {}; try { localStorage.setItem(KEY, '{}'); } catch(e){}
+    applyFilter();
   });
-  apply();
+  applyFilter();
+
+  /* ---- уведомление ---- */
+  var toastEl = document.getElementById('toast'), toastT;
+  function toast(msg, bad){
+    toastEl.textContent = msg;
+    toastEl.className = 'toast' + (bad ? ' bad' : '');
+    toastEl.hidden = false;
+    clearTimeout(toastT);
+    toastT = setTimeout(function(){ toastEl.hidden = true; }, 2600);
+  }
+
+  /* ---- перетаскивание карточек ---- */
+  var board = document.getElementById('board');
+  if (board.dataset.canmove !== '1') return;
+
+  function recount(){
+    document.querySelectorAll('#board .col').forEach(function(col){
+      var n = col.querySelectorAll('.tk').length, s = col.dataset.stage;
+      var c = col.querySelector('[data-count]'); if (c) c.textContent = n;
+      var cc = document.querySelector('[data-cc="'+s+'"]'); if (cc) cc.textContent = n;
+      var em = col.querySelector('.col-empty'); if (em) em.hidden = n > 0;
+    });
+  }
+
+  var dragEl = null;
+  document.querySelectorAll('.tk[draggable="true"]').forEach(function(tk){
+    tk.addEventListener('dragstart', function(e){
+      dragEl = tk; tk.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', tk.dataset.cid); } catch(_){}
+    });
+    tk.addEventListener('dragend', function(){
+      tk.classList.remove('dragging');
+      document.querySelectorAll('.col.drop').forEach(function(c){ c.classList.remove('drop'); });
+    });
+  });
+
+  document.querySelectorAll('#board .col').forEach(function(col){
+    col.addEventListener('dragover', function(e){
+      if (!dragEl) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      col.classList.add('drop');
+    });
+    col.addEventListener('dragleave', function(e){
+      if (!col.contains(e.relatedTarget)) col.classList.remove('drop');
+    });
+    col.addEventListener('drop', function(e){
+      e.preventDefault(); col.classList.remove('drop');
+      if (!dragEl) return;
+      var fromCol = dragEl.closest('.col');
+      var newStage = col.dataset.stage;
+      if (fromCol === col) { dragEl = null; return; }
+
+      var moved = dragEl, moveUrl = moved.dataset.move;
+      col.appendChild(moved);                                   // оптимистично переносим
+      moved.className = moved.className.replace(/stage-\S+/, 'stage-' + newStage);
+      recount();
+      dragEl = null;
+
+      var fd = new FormData(); fd.append('stage', newStage);
+      fetch(moveUrl, {method:'POST', body:fd, headers:{'X-Requested-With':'fetch'}})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+        .then(function(res){
+          if (res.ok && res.j.ok){
+            var when = res.j.since ? (' · ' + res.j.since) : '';
+            toast('Перенесено в «' + col.querySelector('.t').textContent.trim() + '»' + when);
+            var mono = moved.querySelector('.meta .mono');
+            if (mono && res.j.since) mono.textContent = res.j.since;
+          } else {
+            toast((res.j && res.j.error) || 'Не удалось перенести', true);
+            setTimeout(function(){ location.reload(); }, 900);
+          }
+        })
+        .catch(function(){ toast('Ошибка сети — обновляю', true); setTimeout(function(){ location.reload(); }, 900); });
+    });
+  });
 })();
 </script>
 {% endblock %}
