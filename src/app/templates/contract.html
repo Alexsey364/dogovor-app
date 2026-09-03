@@ -126,6 +126,68 @@
     пишутся в журнал изменений — он не стирается и виден всем.</div>
 </div>
 
+{% if can('payments') or perm_level('payments') != 'none' %}
+<div class="card">
+  <div class="card-h"><h2>Платежи</h2>
+    {% if pay_sum and pay_sum.planned %}
+    <span class="muted" style="font-size:13px">получено {{ pay_sum.paid|money }} из {{ pay_sum.planned|money }}</span>
+    {% endif %}
+  </div>
+  {% if payments %}
+  <div class="tablewrap"><table>
+    <thead><tr><th>Тип</th><th>Направление</th><th>Условие</th><th>План</th><th>Сумма</th><th>Оплачено</th><th></th></tr></thead>
+    <tbody>
+      {% for p in payments %}
+      <tr class="{{ 'pay-overdue' if not p.paid_on and p.planned_on and p.planned_on < today }}">
+        <td>{{ PAY_KIND_RU.get(p.kind, p.kind) }}</td>
+        <td class="muted">{{ DIR_RU.get(p.direction, p.direction) }}</td>
+        <td class="muted">{{ (p.condition or '—')|truncate(28) }}</td>
+        <td class="mono">{{ p.planned_on|dt('%d.%m.%y') if p.planned_on else '—' }}</td>
+        <td class="mono">{{ p.amount|money }}</td>
+        <td class="mono">{% if p.paid_on %}<span class="pill ok">{{ p.paid_on|dt('%d.%m.%y') }}</span>{% else %}<span class="pill">ждём</span>{% endif %}</td>
+        <td>
+          {% if perm_level('payments') == 'yes' %}
+            {% if p.paid_on %}
+            <form method="post" action="{{ url_for('payment_paid', pid=p.id) }}" class="inline">
+              <input type="hidden" name="undo" value="1"><button class="mini" type="submit">отменить</button>
+            </form>
+            {% else %}
+            <form method="post" action="{{ url_for('payment_paid', pid=p.id) }}" class="inline">
+              <button class="mini ok" type="submit">оплачен</button>
+            </form>
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+    <div class="empty muted">График платежей пуст.</div>
+  {% endif %}
+  {% if perm_level('payments') == 'yes' %}
+  <div class="pay-tools">
+    {% if not payments %}
+    <form method="post" action="{{ url_for('payment_schedule', cid=c.id) }}" class="inline">
+      <button class="btn-sm" type="submit">Построить график (аванс + остаток)</button>
+    </form>
+    {% endif %}
+    <details class="pay-add">
+      <summary class="btn-sm">+ Платёж вручную</summary>
+      <form method="post" action="{{ url_for('payment_add', cid=c.id) }}" class="form" style="padding-top:12px">
+        <label>Тип<select name="kind"><option value="advance">аванс</option><option value="stage">этап</option><option value="final" selected>окончательный</option></select></label>
+        <label>Направление<select name="direction"><option value="incoming">нам платят</option><option value="outgoing">мы платим</option></select></label>
+        <label>Плановая дата<input type="date" name="planned_on"></label>
+        <label>Сумма, ₽<input type="number" step="0.01" name="amount" required></label>
+        <label class="wide">Условие<input name="condition" placeholder="например: по акту этапа 1 + 90 дней"></label>
+        <div class="form-foot"><button class="btn-sm" type="submit">Добавить</button></div>
+      </form>
+    </details>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="grid2">
   <div class="card">
     <div class="card-h"><h2>Исполнение</h2></div>

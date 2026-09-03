@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block crumb %}Платежи{% endblock %}
+{% block body %}
+<div class="stats">
+  <div class="stat s-ok"><div class="v mono">{{ totals.to_get|money }}</div><div class="l">к получению</div></div>
+  <div class="stat s-warn"><div class="v mono">{{ totals.to_pay|money }}</div><div class="l">к оплате нами</div></div>
+  <div class="stat s-crit"><div class="v">{{ totals.overdue }}</div><div class="l">просрочено платежей</div></div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Платежи</h2>
+    <div class="filters">
+      {% set fl = [('open','Ожидаются'),('overdue','Просрочено'),('incoming','Нам платят'),('outgoing','Мы платим'),('paid','Оплаченные')] %}
+      {% for code, label in fl %}<a class="chip {{ 'on' if flt==code }}" href="{{ url_for('payments_page', f=code) }}">{{ label }}</a>{% endfor %}
+    </div>
+  </div>
+  {% if rows %}
+  <div class="tablewrap"><table>
+    <thead><tr><th>Дата</th><th>Договор</th><th>Заказчик</th><th>Тип</th><th>Направление</th><th>Сумма</th><th>Статус</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr onclick="location='{{ url_for('contract', cid=r.cid) }}'"
+          class="{{ 'pay-overdue' if not r.paid_on and r.planned_on and r.planned_on < today }}">
+        <td class="mono">{{ r.planned_on|dt('%d.%m.%y') if r.planned_on else '—' }}</td>
+        <td class="mono">{{ r.number_text }}</td>
+        <td>{{ r.counterparty or '—' }}</td>
+        <td>{{ PAY_KIND_RU.get(r.kind, r.kind) }}</td>
+        <td class="muted">{{ DIR_RU.get(r.direction, r.direction) }}</td>
+        <td class="mono">{{ r.amount|money }}</td>
+        <td>
+          {% if r.paid_on %}<span class="pill ok">оплачен {{ r.paid_on|dt('%d.%m.%y') }}</span>
+          {% elif r.planned_on and r.planned_on < today %}<span class="pill crit">просрочен</span>
+          {% else %}<span class="pill">ждём</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+    <div class="empty muted">Платежей в этой выборке нет.</div>
+  {% endif %}
+</div>
+{% endblock %}

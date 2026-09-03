@@ -178,6 +178,12 @@ def next_number() -> str:
 
 
 @app.context_processor
+def inject_today():
+    import datetime
+    return {"today": datetime.date.today()}
+
+
+@app.context_processor
 def inject_nav():
     """Счётчики для бокового меню."""
     if not g.get("user"):
@@ -347,12 +353,138 @@ def contract(cid: int):
         WHERE cf.contract_id=%s
         ORDER BY cf.kind, cf.version DESC, cf.id DESC
     """, (cid,))
-    return render_template("contract.html", c=c, findings=findings, files=files)
+    payments = []
+    pay_sum = {}
+    if perm_level("payments") != "none":
+        payments = db.query("""
+            SELECT id, kind, direction, planned_on, amount, paid_on, paid_amount, condition
+            FROM payments WHERE contract_id=%s ORDER BY planned_on NULLS LAST, id
+        """, (cid,))
+        pay_sum = db.query_one("""
+            SELECT coalesce(sum(amount),0) AS planned,
+                   coalesce(sum(paid_amount) FILTER (WHERE paid_on IS NOT NULL),0) AS paid
+            FROM payments WHERE contract_id=%s AND direction='incoming'
+        """, (cid,)) or {}
+    return render_template("contract.html", c=c, findings=findings, files=files,
+                           payments=payments, pay_sum=pay_sum)
 
 
 # ------------------------------------------------------------------
 #  Контрагенты
 # ------------------------------------------------------------------
+
+PAY_KIND_RU = {"advance": "аванс", "stage": "этап", "final": "окончательный"}
+DIR_RU = {"incoming": "нам платят", "outgoing": "мы платим"}
+app.jinja_env.globals.update(PAY_KIND_RU=PAY_KIND_RU, DIR_RU=DIR_RU)
+
+
+@app.route("/payments")
+@login_required
+def payments_page():
+    if perm_level("payments") == "none":
+        abort(403)
+    flt = request.args.get("f", "open")
+    where = "p.paid_on IS NULL"
+    if flt == "overdue":
+        where = "p.paid_on IS NULL AND p.planned_on < current_date"
+    elif flt == "incoming":
+        where = "p.paid_on IS NULL AND p.direction='incoming'"
+    elif flt == "outgoing":
+        where = "p.paid_on IS NULL AND p.direction='outgoing'"
+    elif flt == "paid":
+        where = "p.paid_on IS NOT NULL"
+    rows = db.query(f"""
+        SELECT p.id, p.kind, p.direction, p.planned_on, p.amount, p.paid_on,
+               p.condition, c.id AS cid, c.number_text, cp.name AS counterparty
+        FROM payments p JOIN contracts c ON c.id=p.contract_id
+        LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        WHERE {where}
+        ORDER BY p.planned_on NULLS LAST, p.id
+    """)
+    totals = db.query_one("""
+        SELECT
+          coalesce(sum(amount) FILTER (WHERE paid_on IS NULL AND direction='incoming'),0) AS to_get,
+          coalesce(sum(amount) FILTER (WHERE paid_on IS NULL AND direction='outgoing'),0) AS to_pay,
+          count(*) FILTER (WHERE paid_on IS NULL AND planned_on < current_date) AS overdue
+        FROM payments
+    """) or {}
+    return render_template("payments.html", rows=rows, flt=flt, totals=totals)
+
+
+@app.route("/contract/<int:cid>/payment", methods=["POST"])
+@login_required
+def payment_add(cid):
+    if perm_level("payments") != "yes":
+        abort(403)
+    kind = request.form.get("kind", "final")
+    direction = request.form.get("direction", "incoming")
+    planned = request.form.get("planned_on") or None
+    amount = request.form.get("amount") or None
+    condition = (request.form.get("condition") or "").strip() or None
+    if kind not in PAY_KIND_RU:
+        kind = "final"
+    if direction not in DIR_RU:
+        direction = "incoming"
+    if not amount:
+        flash("Укажите сумму платежа")
+        return redirect(url_for("contract", cid=cid))
+    pid = db.query_one(
+        "INSERT INTO payments(contract_id, kind, direction, planned_on, amount, condition) "
+        "VALUES(%s,%s,%s,%s,%s,%s) RETURNING id",
+        (cid, kind, direction, planned, amount, condition))["id"]
+    audit("payment_add", "contract", cid, after={"amount": amount, "kind": kind})
+    flash("Платёж добавлен в график")
+    return redirect(url_for("contract", cid=cid))
+
+
+@app.route("/payment/<int:pid>/paid", methods=["POST"])
+@login_required
+def payment_paid(pid):
+    if perm_level("payments") != "yes":
+        abort(403)
+    p = db.query_one("SELECT contract_id, amount FROM payments WHERE id=%s", (pid,))
+    if not p:
+        abort(404)
+    if request.form.get("undo") == "1":
+        db.execute("UPDATE payments SET paid_on=NULL, paid_amount=NULL WHERE id=%s", (pid,))
+    else:
+        paid_on = request.form.get("paid_on") or None
+        paid_amount = request.form.get("paid_amount") or p["amount"]
+        db.execute("UPDATE payments SET paid_on=coalesce(%s, current_date), paid_amount=%s WHERE id=%s",
+                   (paid_on, paid_amount, pid))
+    audit("payment_paid", "contract", p["contract_id"], after={"payment": pid})
+    return redirect(url_for("contract", cid=p["contract_id"]))
+
+
+@app.route("/contract/<int:cid>/payment/schedule", methods=["POST"])
+@login_required
+def payment_schedule(cid):
+    """Быстрый график: аванс (если есть) + остаток."""
+    if perm_level("payments") != "yes":
+        abort(403)
+    c = db.query_one("SELECT amount, advance_amount, advance_pct FROM contracts WHERE id=%s", (cid,))
+    if not c or not c["amount"]:
+        flash("У договора не указана сумма — график не построить")
+        return redirect(url_for("contract", cid=cid))
+    if db.query_one("SELECT 1 FROM payments WHERE contract_id=%s LIMIT 1", (cid,)):
+        flash("График уже есть — добавляйте платежи вручную")
+        return redirect(url_for("contract", cid=cid))
+    from decimal import Decimal
+    total = Decimal(c["amount"])
+    adv = Decimal(c["advance_amount"]) if c["advance_amount"] else Decimal(0)
+    if adv > 0:
+        db.execute("INSERT INTO payments(contract_id, kind, direction, amount, condition) "
+                   "VALUES(%s,'advance','incoming',%s,%s)",
+                   (cid, adv, "аванс по договору"))
+    rest = total - adv
+    if rest > 0:
+        db.execute("INSERT INTO payments(contract_id, kind, direction, amount, condition) "
+                   "VALUES(%s,'final','incoming',%s,%s)",
+                   (cid, rest, "окончательный расчёт по акту"))
+    audit("payment_schedule", "contract", cid)
+    flash("Простой график создан: аванс и остаток")
+    return redirect(url_for("contract", cid=cid))
+
 
 @app.route("/counterparties")
 @login_required

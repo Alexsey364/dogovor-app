@@ -29,6 +29,9 @@
         Реестр <b>{{ nav.contracts if nav }}</b></a>
       <a href="{{ url_for('counterparties') }}" class="{{ 'on' if request.endpoint=='counterparties' }}">
         Контрагенты <b>{{ nav.counterparties if nav }}</b></a>
+      {% if perm_level('payments') != 'none' %}
+      <a href="{{ url_for('payments_page') }}" class="{{ 'on' if request.endpoint=='payments_page' }}">Платежи</a>
+      {% endif %}
 
       {% if can('manage_users') or can('manage_permissions') %}
       <div class="grp">Настройка</div>
