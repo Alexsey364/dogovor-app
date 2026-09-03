@@ -27,7 +27,12 @@
 
 <div class="card">
   <div class="card-h"><h2>Проверка договора</h2>
-    {% if findings %}<span class="badge crit">{{ findings|selectattr('severity','equalto','critical')|list|length }} крит.</span>{% else %}<span class="badge ok">чисто</span>{% endif %}
+    <div style="display:flex;align-items:center;gap:10px">
+      {% if findings %}<span class="badge crit">{{ findings|selectattr('severity','equalto','critical')|list|length }} крит.</span>{% else %}<span class="badge ok">чисто</span>{% endif %}
+      <form method="post" action="{{ url_for('contract_review', cid=c.id) }}" style="margin:0">
+        <button class="btn-sm" type="submit">Проверить</button>
+      </form>
+    </div>
   </div>
   {% if findings %}
     {% for f in findings %}

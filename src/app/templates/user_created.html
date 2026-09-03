@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ url_for('users') }}">Пользователи</a> · создан{% endblock %}
+{% block body %}
+<div class="card" style="max-width:460px">
+  <div class="card-h"><h2>Пользователь создан</h2></div>
+  <div style="padding:16px">
+    <div class="note" style="margin-bottom:14px">
+      Передайте эти данные сотруднику. Пароль показывается <b>один раз</b> —
+      при первом входе система попросит его сменить.
+    </div>
+    <div class="kv"><b>Логин</b><span class="mono">{{ login }}</span></div>
+    <div class="kv"><b>Временный пароль</b><span class="mono" style="font-size:16px">{{ password }}</span></div>
+    <div class="form-foot" style="padding:16px 0 0">
+      <a class="btn" href="{{ url_for('user_new') }}">Создать ещё</a>
+      <a class="btn-ghost" href="{{ url_for('users') }}">К списку</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

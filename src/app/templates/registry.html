@@ -4,6 +4,7 @@
 <div class="card">
   <div class="card-h">
     <h2>{{ rows|length }} договоров</h2>
+    {% if g.user.role_code in ('manager','lawyer','admin') %}<a class="btn-sm" href="{{ url_for('contract_new') }}">+ Договор</a>{% endif %}
     <div class="filters">
       {% set fl = [('all','Все'),('active','В работе'),('findings','С замечаниями'),('warranty','На гарантии'),('cancelled','Аннулированные')] %}
       {% for code, label in fl %}

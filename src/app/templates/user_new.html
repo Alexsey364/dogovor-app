@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ url_for('users') }}">Пользователи</a> · новый{% endblock %}
+{% block body %}
+<div class="card" style="max-width:560px">
+  <div class="card-h"><h2>Новый пользователь</h2></div>
+  <form method="post" class="form">
+    <label>Фамилия и имя<input name="full_name" required></label>
+    <label>Логин<input name="login" required placeholder="i.ivanov"></label>
+    <label>Роль
+      <select name="role">
+        {% for r in roles %}<option value="{{ r.code }}" {{ 'selected' if r.code=='manager' }}>{{ r.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Отдел
+      <select name="department"><option value="">—</option>
+        {% for d in depts %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="form-foot">
+      <button class="btn" type="submit">Создать</button>
+      <a class="btn-ghost" href="{{ url_for('users') }}">Отмена</a>
+      <span class="muted">Пароль сгенерируется и покажется один раз</span>
+    </div>
+  </form>
+</div>
+{% endblock %}

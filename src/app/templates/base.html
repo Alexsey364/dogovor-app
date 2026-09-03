@@ -20,6 +20,9 @@
         Доска стадий <b>{{ nav.active if nav }}</b></a>
       <a href="{{ url_for('warranty') }}" class="{{ 'on' if request.endpoint=='warranty' }}">
         Гарантии <b>{{ nav.warranty if nav }}</b></a>
+      {% if g.user.role_code in ('manager','lawyer','admin') %}
+      <a href="{{ url_for('contract_new') }}" class="{{ 'on' if request.endpoint=='contract_new' }}">+ Создать договор</a>
+      {% endif %}
 
       <div class="grp">Данные</div>
       <a href="{{ url_for('registry') }}" class="{{ 'on' if request.endpoint in ('registry','contract') }}">
@@ -39,7 +42,7 @@
     <header class="top">
       <div class="crumb">{% block crumb %}{% endblock %}</div>
       <div class="who">
-        <span>{{ g.user.full_name }} · {{ g.user.role_name }}</span>
+        <a class="who-link" href="{{ url_for('change_password') }}">{{ g.user.full_name }} · {{ g.user.role_name }}</a>
         <a class="btn-ghost" href="{{ url_for('logout') }}">Выйти</a>
       </div>
     </header>
