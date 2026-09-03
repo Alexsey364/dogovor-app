@@ -526,3 +526,28 @@ tr.task-done td:nth-child(2){text-decoration:line-through}
 .filter-foot{grid-column:1 / -1;display:flex;align-items:center;gap:10px;
   border-top:1px solid var(--line-soft);padding-top:12px}
 @media (max-width:900px){.filter-form{grid-template-columns:1fr 1fr}}
+
+/* ============================================================
+   СОВРЕМЕННОЕ БОКОВОЕ МЕНЮ С ИКОНКАМИ
+   ============================================================ */
+.app{grid-template-columns:242px 1fr}
+.side{padding:14px 0}
+.nav a{position:relative;gap:11px;margin:1px 10px;padding:9px 12px;border-radius:9px;
+  border-left:none;color:var(--ink-2)}
+.nav a .ic{width:18px;height:18px;flex:0 0 auto;stroke:currentColor;stroke-width:1.8;
+  fill:none;stroke-linecap:round;stroke-linejoin:round;opacity:.8}
+.nav a .lbl{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav a:hover{background:var(--surface-2)}
+.nav a.on{background:linear-gradient(100deg,var(--accent),var(--grad-b));
+  color:#fff;font-weight:700;box-shadow:0 3px 10px rgba(31,95,115,.28)}
+.nav a.on .ic{opacity:1}
+.nav a.on b{color:#fff;background:rgba(255,255,255,.22)}
+.nav a b.hot{background:var(--crit);color:#fff}
+.nav a.on b.hot{background:rgba(255,255,255,.28);color:#fff}
+.nav .grp{padding:14px 22px 5px}
+
+/* мобильная версия: прячем подписи, оставляем иконки-строки */
+@media (max-width:900px){
+  .nav a{margin:0;border-radius:7px}
+  .nav a .lbl{font-size:13px}
+}
