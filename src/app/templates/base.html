@@ -20,7 +20,7 @@
         Доска стадий <b>{{ nav.active if nav }}</b></a>
       <a href="{{ url_for('warranty') }}" class="{{ 'on' if request.endpoint=='warranty' }}">
         Гарантии <b>{{ nav.warranty if nav }}</b></a>
-      {% if g.user.role_code in ('manager','lawyer','admin') %}
+      {% if can('create_contract') %}
       <a href="{{ url_for('contract_new') }}" class="{{ 'on' if request.endpoint=='contract_new' }}">+ Создать договор</a>
       {% endif %}
 
@@ -30,10 +30,17 @@
       <a href="{{ url_for('counterparties') }}" class="{{ 'on' if request.endpoint=='counterparties' }}">
         Контрагенты <b>{{ nav.counterparties if nav }}</b></a>
 
+      {% if can('manage_users') or can('manage_permissions') %}
       <div class="grp">Настройка</div>
-      <a href="{{ url_for('users') }}" class="{{ 'on' if request.endpoint=='users' }}">
+      {% if can('manage_users') %}
+      <a href="{{ url_for('users') }}" class="{{ 'on' if request.endpoint in ('users','user_new') }}">
         Пользователи <b>{{ nav.users if nav }}</b></a>
+      {% endif %}
+      {% if can('manage_permissions') %}
       <a href="{{ url_for('permissions') }}" class="{{ 'on' if request.endpoint=='permissions' }}">Права ролей</a>
+      <a href="{{ url_for('roles_page') }}" class="{{ 'on' if request.endpoint=='roles_page' }}">Роли</a>
+      {% endif %}
+      {% endif %}
     </nav>
     <div class="side-foot"><span class="dot"></span>сервер в офисе · копия на NAS</div>
   </aside>

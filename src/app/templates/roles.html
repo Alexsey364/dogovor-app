@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ url_for('permissions') }}">Права ролей</a> · роли{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h"><h2>Роли ({{ rows|length }})</h2></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Роль</th><th>Код</th><th>Описание</th><th>Людей</th><th>Тип</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><b>{{ r.name }}</b></td>
+        <td class="mono muted">{{ r.code }}</td>
+        <td class="muted">{{ r.description or '—' }}</td>
+        <td class="mono">{{ r.users }}</td>
+        <td>{% if r.is_builtin %}<span class="pill">встроенная</span>{% else %}<span class="pill ok">своя</span>{% endif %}</td>
+        <td>
+          {% if not r.is_builtin and r.users == 0 %}
+          <form method="post" action="{{ url_for('role_delete', code=r.code) }}" class="inline"
+                onsubmit="return confirm('Удалить роль {{ r.name }}?')">
+            <button class="mini" type="submit">удалить</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+
+<div class="card" style="max-width:520px">
+  <div class="card-h"><h2>Новая роль</h2></div>
+  <form method="post" action="{{ url_for('role_new') }}" class="form">
+    <label class="wide">Название<input name="name" required placeholder="Например: Снабженец"></label>
+    <label class="wide">Описание<input name="description" placeholder="Что делает эта роль"></label>
+    <div class="form-foot">
+      <button class="btn" type="submit">Создать роль</button>
+      <span class="muted">Новой роли всё запрещено — права задаются в матрице</span>
+    </div>
+  </form>
+</div>
+{% endblock %}

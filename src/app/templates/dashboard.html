@@ -4,9 +4,12 @@
 
 <div class="stats">
   <div class="stat s-acc"><div class="v">{{ stats.total }}</div><div class="l">договоров всего</div></div>
-  <div class="stat s-ok"><div class="v mono">{{ stats.total_amount|money }}</div><div class="l">на сумму</div></div>
+  <div class="stat s-acc"><div class="v">{{ stats.active }}</div><div class="l">в работе и действующих</div></div>
   <div class="stat s-crit"><div class="v">{{ sev.crit }}</div><div class="l">критических замечаний</div></div>
   <div class="stat s-warn"><div class="v">{{ sev.warn }}</div><div class="l">предупреждений</div></div>
+  {% if g.user.role_code == 'admin' %}
+  <div class="stat s-ok"><div class="v mono">{{ stats.total_amount|money }}</div><div class="l">на сумму</div></div>
+  {% endif %}
 </div>
 
 <div class="grid2">

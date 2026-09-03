@@ -105,12 +105,17 @@ h1,h2{margin:0}
 .pl-n{font-size:22px;font-weight:700}
 .pl-l{font-size:12px;color:var(--muted);margin-top:2px}
 
-/* ---- доска ---- */
-.board{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:12px;
-  max-width:100%;scroll-snap-type:x proximity}
-.col{flex:0 0 224px;scroll-snap-align:start;background:var(--surface-2);
+/* ---- доска: колонки заполняют ширину и переносятся, без горизонтальной прокрутки ---- */
+.board{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;padding-bottom:12px;max-width:100%}
+.col{flex:1 1 200px;min-width:180px;max-width:340px;background:var(--surface-2);
   border:1px solid var(--line-soft);border-radius:9px;padding:10px;
-  max-height:calc(100vh - 150px);overflow-y:auto}
+  max-height:calc(100vh - 210px);overflow-y:auto}
+/* фильтр колонок */
+.colfilter{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px}
+.colchip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2);
+  background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:4px 11px;cursor:pointer}
+.colchip input{margin:0}
+.colchip .cc{font-family:"Consolas",monospace;color:var(--muted);font-size:11.5px}
 .col-h{display:flex;justify-content:space-between;margin-bottom:9px;padding:0 2px}
 .col-h .t{font-size:12.5px;font-weight:700;color:var(--ink-2)}
 .col-h .c{font-size:11.5px;color:var(--muted);font-family:"Consolas",monospace}
@@ -181,6 +186,13 @@ tbody tr:last-child td{border-bottom:none}
 /* ---- матрица прав ---- */
 .matrix td:not(.cap),.matrix th:not(:first-child){text-align:center}
 .matrix .cap{font-weight:600}
+.matrix td{text-align:center}
+.matrix .cap{text-align:left}
+.lvl{padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);
+  color:var(--ink);font-size:12.5px}
+.lvl-none{color:var(--muted)}
+.lvl-yes,.lvl-all{border-color:var(--ok)}
+.lvl-dept,.lvl-own,.lvl-view{border-color:var(--warn)}
 .yes{color:var(--ok);font-weight:700}
 .no{color:var(--muted)}
 .part{color:var(--warn);font-weight:700}

@@ -88,14 +88,39 @@ def load_user():
             "u.must_change_password, d.name AS dept "
             "FROM users u JOIN roles r ON r.code=u.role_code "
             "LEFT JOIN departments d ON d.id=u.department_id WHERE u.id=%s", (uid,))
+        # права роли
+        g.perms = {r["cap_code"]: r["level"] for r in db.query(
+            "SELECT cap_code, level FROM role_permissions WHERE role_code=%s",
+            (g.user["role_code"],))}
         # заставляем сменить временный пароль до входа в остальные разделы
         if g.user and g.user["must_change_password"] and request.endpoint not in (
                 "change_password", "logout", "static"):
             return redirect(url_for("change_password"))
 
 
-CAN_CREATE = ("manager", "lawyer", "admin")
-CAN_EDIT = ("manager", "lawyer", "admin")
+def can(cap: str) -> bool:
+    """Есть ли у текущего пользователя доступ к возможности (уровень не 'none')."""
+    return g.get("perms", {}).get(cap, "none") != "none"
+
+
+def perm_level(cap: str) -> str:
+    return g.get("perms", {}).get(cap, "none")
+
+
+app.jinja_env.globals.update(can=can, perm_level=perm_level)
+
+
+def require_cap(cap):
+    def deco(f):
+        @wraps(f)
+        def wrapper(*a, **kw):
+            if not g.get("user"):
+                return redirect(url_for("login", next=request.path))
+            if not can(cap):
+                abort(403)
+            return f(*a, **kw)
+        return wrapper
+    return deco
 
 
 def audit(action: str, entity: str, entity_id: int, before=None, after=None):
@@ -335,7 +360,7 @@ def warranty():
 # ------------------------------------------------------------------
 
 @app.route("/users")
-@login_required
+@require_cap("manage_users")
 def users():
     rows = db.query("""
         SELECT u.id, u.login, u.full_name, u.role_code, r.name AS role_name,
@@ -347,13 +372,103 @@ def users():
     return render_template("users.html", rows=rows)
 
 
-@app.route("/permissions")
-@login_required
+LEVELS = [("none", "нет"), ("own", "свои"), ("dept", "свой отдел"),
+          ("view", "просмотр"), ("all", "все"), ("yes", "да")]
+
+
+def role_order():
+    return ("CASE code WHEN 'manager' THEN 0 WHEN 'lawyer' THEN 1 "
+            "WHEN 'head' THEN 2 WHEN 'accountant' THEN 3 WHEN 'admin' THEN 5 ELSE 4 END")
+
+
+@app.route("/permissions", methods=["GET", "POST"])
+@require_cap("manage_permissions")
 def permissions():
-    roles = db.query("SELECT code, name, description FROM roles ORDER BY "
-                     "CASE code WHEN 'manager' THEN 0 WHEN 'lawyer' THEN 1 "
-                     "WHEN 'head' THEN 2 WHEN 'accountant' THEN 3 ELSE 4 END")
-    return render_template("permissions.html", roles=roles)
+    roles = db.query(f"SELECT code, name, is_builtin FROM roles ORDER BY {role_order()}")
+    caps = db.query("SELECT code, name FROM capabilities ORDER BY ord")
+    if request.method == "POST":
+        for cap in caps:
+            for role in roles:
+                if role["code"] == "admin":
+                    continue  # админ всегда может всё
+                key = f"{role['code']}__{cap['code']}"
+                if key not in request.form:
+                    continue  # не трогаем поля, которых нет в форме
+                level = request.form.get(key, "none")
+                if level not in dict(LEVELS):
+                    level = "none"
+                db.execute(
+                    "INSERT INTO role_permissions(role_code, cap_code, level) VALUES(%s,%s,%s) "
+                    "ON CONFLICT (role_code, cap_code) DO UPDATE SET level=EXCLUDED.level",
+                    (role["code"], cap["code"], level))
+        audit("permissions", "role_permissions", 0)
+        flash("Права сохранены")
+        return redirect(url_for("permissions"))
+    matrix = {}
+    for r in db.query("SELECT role_code, cap_code, level FROM role_permissions"):
+        matrix[(r["role_code"], r["cap_code"])] = r["level"]
+    return render_template("permissions.html", roles=roles, caps=caps,
+                           matrix=matrix, levels=LEVELS)
+
+
+@app.route("/roles")
+@require_cap("manage_permissions")
+def roles_page():
+    rows = db.query(f"""
+        SELECT r.code, r.name, r.description, r.is_builtin,
+               (SELECT count(*) FROM users u WHERE u.role_code=r.code) AS users
+        FROM roles r ORDER BY {role_order()}""")
+    return render_template("roles.html", rows=rows)
+
+
+@app.route("/roles/new", methods=["POST"])
+@require_cap("manage_permissions")
+def role_new():
+    import re
+    name = (request.form.get("name") or "").strip()
+    desc = (request.form.get("description") or "").strip()
+    code = (request.form.get("code") or "").strip().lower()
+    if not code:
+        code = re.sub(r"[^a-z0-9_]", "", (name.lower().replace(" ", "_")))[:20] or None
+    if not name or not code:
+        flash("Укажите название роли")
+    elif db.query_one("SELECT 1 FROM roles WHERE code=%s", (code,)):
+        flash("Роль с таким кодом уже есть")
+    else:
+        db.execute("INSERT INTO roles(code, name, description, is_builtin) VALUES(%s,%s,%s,false)",
+                   (code, name, desc))
+        # новой роли — всё запрещено по умолчанию
+        for cap in db.query("SELECT code FROM capabilities"):
+            db.execute("INSERT INTO role_permissions(role_code, cap_code, level) VALUES(%s,%s,'none') "
+                       "ON CONFLICT DO NOTHING", (code, cap["code"]))
+        flash(f"Роль «{name}» создана — настройте её права в матрице")
+    return redirect(url_for("roles_page"))
+
+
+@app.route("/roles/<code>/edit", methods=["POST"])
+@require_cap("manage_permissions")
+def role_edit(code):
+    name = (request.form.get("name") or "").strip()
+    desc = (request.form.get("description") or "").strip()
+    if name:
+        db.execute("UPDATE roles SET name=%s, description=%s WHERE code=%s", (name, desc, code))
+        flash("Роль обновлена")
+    return redirect(url_for("roles_page"))
+
+
+@app.route("/roles/<code>/delete", methods=["POST"])
+@require_cap("manage_permissions")
+def role_delete(code):
+    r = db.query_one("SELECT is_builtin FROM roles WHERE code=%s", (code,))
+    n = db.query_one("SELECT count(*) AS n FROM users WHERE role_code=%s", (code,))["n"]
+    if not r or r["is_builtin"]:
+        flash("Встроенную роль удалить нельзя")
+    elif n:
+        flash(f"Нельзя удалить: роль назначена {n} пользователям")
+    else:
+        db.execute("DELETE FROM roles WHERE code=%s", (code,))
+        flash("Роль удалена")
+    return redirect(url_for("roles_page"))
 
 
 # ------------------------------------------------------------------
@@ -384,8 +499,7 @@ def change_password():
 
 
 @app.route("/users/new", methods=["GET", "POST"])
-@login_required
-@admin_required
+@require_cap("manage_users")
 def user_new():
     depts = db.query("SELECT id, name FROM departments ORDER BY name")
     roles = db.query("SELECT code, name FROM roles ORDER BY name")
@@ -410,8 +524,7 @@ def user_new():
 
 
 @app.route("/users/<int:uid>/toggle", methods=["POST"])
-@login_required
-@admin_required
+@require_cap("manage_users")
 def user_toggle(uid):
     if uid != g.user["id"]:
         db.execute("UPDATE users SET is_active = NOT is_active WHERE id=%s", (uid,))
@@ -421,7 +534,7 @@ def user_toggle(uid):
 @app.route("/contract/new", methods=["GET", "POST"])
 @login_required
 def contract_new():
-    if g.user["role_code"] not in CAN_CREATE:
+    if not can("create_contract"):
         abort(403)
     types = db.query("SELECT code, name, default_advance_pct, warranty_months FROM contract_types ORDER BY name")
     cps = db.query("SELECT id, name FROM counterparties ORDER BY name")
@@ -483,7 +596,7 @@ STAGES = ["draft", "internal_review", "legal_review", "at_counterparty",
 @app.route("/contract/<int:cid>/stage", methods=["POST"])
 @login_required
 def contract_stage(cid):
-    if g.user["role_code"] not in CAN_EDIT:
+    if not can("edit_contract"):
         abort(403)
     new_stage = request.form.get("stage")
     if new_stage not in STAGES:
@@ -498,7 +611,7 @@ def contract_stage(cid):
 @app.route("/contract/<int:cid>/edit", methods=["GET", "POST"])
 @login_required
 def contract_edit(cid):
-    if g.user["role_code"] not in CAN_EDIT:
+    if not can("edit_contract"):
         abort(403)
     c = db.query_one("SELECT * FROM contracts WHERE id=%s", (cid,))
     if not c:
@@ -525,6 +638,8 @@ def contract_edit(cid):
 @app.route("/finding/<int:fid>/resolve", methods=["POST"])
 @login_required
 def finding_resolve(fid):
+    if not can("review_decide"):
+        abort(403)
     decision = request.form.get("decision")  # accepted | rejected | reopen
     f = db.query_one("SELECT contract_id FROM review_findings WHERE id=%s", (fid,))
     if not f:

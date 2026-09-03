@@ -2,45 +2,52 @@
 {% block crumb %}Права ролей{% endblock %}
 {% block body %}
 <div class="note">
-  <b>Администратор может всё.</b> Базовая роль задаёт основу, поверх неё
-  накладываются уточнения — по отделу, типу договора, сумме, стадии.
-  Запрет сильнее разрешения, кроме роли администратора.
+  <b>Матрица прав настраивается здесь.</b> Для каждой роли и каждой возможности
+  выберите уровень доступа. Администратор всегда может всё — его столбец не меняется.
+  <a class="link" href="{{ url_for('roles_page') }}">Управление ролями →</a>
 </div>
 
+<form method="post">
 <div class="card">
-  <div class="card-h"><h2>Роли</h2></div>
-  {% for r in roles %}
-  <div class="kv"><b>{{ r.name }}</b><span class="muted">{{ r.description }}</span></div>
-  {% endfor %}
-</div>
-
-<div class="card">
-  <div class="card-h"><h2>Базовая матрица</h2></div>
+  <div class="card-h"><h2>Матрица прав</h2><button class="btn-sm" type="submit">Сохранить</button></div>
   <div class="tablewrap"><table class="matrix">
-    <thead><tr><th>Возможность</th><th>Менеджер</th><th>Юрист</th><th>Руковод.</th><th>Бухгалтер</th><th>Админ</th></tr></thead>
+    <thead><tr><th>Возможность</th>
+      {% for r in roles %}<th>{{ r.name }}</th>{% endfor %}
+    </tr></thead>
     <tbody>
-      {% set M = [
-        ['Создать договор','да','да','нет','нет','да'],
-        ['Видеть договоры','свой отдел','все','все','подписанные','все'],
-        ['Решать по замечаниям','нет','да','нет','нет','да'],
-        ['Согласовать и отправить','нет','да','нет','нет','да'],
-        ['Вести исполнение и акты','свои','все','нет','нет','все'],
-        ['Вести платежи','нет','видит','видит','да','да'],
-        ['Расторгнуть, изменить срок','нет','да','нет','нет','да'],
-        ['Удалить договор','нет','нет','нет','нет','да'],
-        ['Учётные записи и роли','нет','нет','нет','нет','да'],
-        ['Журнал действий','нет','да','да','нет','да'],
-      ] %}
-      {% for row in M %}
+      {% for cap in caps %}
       <tr>
-        <td class="cap">{{ row[0] }}</td>
-        {% for cell in row[1:] %}
-          <td class="{{ 'yes' if cell=='да' else 'no' if cell=='нет' else 'part' }}">{{ cell }}</td>
+        <td class="cap">{{ cap.name }}</td>
+        {% for r in roles %}
+          {% set cur = matrix.get((r.code, cap.code), 'none') %}
+          <td>
+            {% if r.code == 'admin' %}
+              <span class="yes">да</span>
+            {% else %}
+              <select name="{{ r.code }}__{{ cap.code }}" class="lvl lvl-{{ cur }}">
+                {% for val, label in levels %}<option value="{{ val }}" {{ 'selected' if val==cur }}>{{ label }}</option>{% endfor %}
+              </select>
+            {% endif %}
+          </td>
         {% endfor %}
       </tr>
       {% endfor %}
     </tbody>
   </table></div>
-  <div class="legend">Единственное, чего не может даже администратор — чистить журнал действий: записи только добавляются.</div>
+  <div class="form-foot"><button class="btn" type="submit">Сохранить изменения</button>
+    <span class="muted">Права применяются при следующем действии пользователя</span></div>
+</div>
+</form>
+
+<div class="card">
+  <div class="card-h"><h2>Что означают уровни</h2></div>
+  <div class="kv"><b>нет</b><span class="muted">не может и не видит</span></div>
+  <div class="kv"><b>свои</b><span class="muted">только свои договоры — созданные им или где он ответственный</span></div>
+  <div class="kv"><b>свой отдел</b><span class="muted">договоры своего отдела</span></div>
+  <div class="kv"><b>просмотр</b><span class="muted">только смотреть, изменять нельзя</span></div>
+  <div class="kv"><b>все</b><span class="muted">все договоры компании</span></div>
+  <div class="kv"><b>да</b><span class="muted">действие разрешено полностью (для простых действий без объёма)</span></div>
+  <div class="legend">«Все» — для возможностей с объёмом (видеть, править, исполнение, отчёты).
+    «Да» — для действий без объёма (создать, решать по замечаниям, согласовать, удалить, управление).</div>
 </div>
 {% endblock %}

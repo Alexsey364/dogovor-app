@@ -1,9 +1,21 @@
 {% extends "base.html" %}
 {% block crumb %}Доска стадий{% endblock %}
 {% block body %}
-<div class="board">
+<div class="card">
+  <div class="card-h"><h2>Стадии</h2>
+    <button class="btn-sm" type="button" id="allcols">Показать все</button>
+  </div>
+  <div class="colfilter" id="colfilter">
+    {% for s in stage_order %}
+    <label class="colchip"><input type="checkbox" data-stage="{{ s }}" checked> {{ STAGE_RU[s] }}
+      <span class="cc">{{ cols[s]|length }}</span></label>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="board" id="board">
   {% for s in stage_order %}
-  <div class="col">
+  <div class="col" data-stage="{{ s }}">
     <div class="col-h"><span class="t">{{ STAGE_RU[s] }}</span><span class="c">{{ cols[s]|length }}</span></div>
     {% for r in cols[s] %}
     <a class="tk stage-{{ s }}" href="{{ url_for('contract', cid=r.id) }}">
@@ -20,4 +32,35 @@
   </div>
   {% endfor %}
 </div>
+
+<script>
+(function(){
+  var KEY = 'board_hidden_stages';
+  var hidden = {};
+  try { hidden = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e){}
+
+  function apply(){
+    document.querySelectorAll('#board .col').forEach(function(col){
+      col.hidden = !!hidden[col.dataset.stage];
+    });
+    document.querySelectorAll('#colfilter input').forEach(function(cb){
+      cb.checked = !hidden[cb.dataset.stage];
+    });
+  }
+  document.querySelectorAll('#colfilter input').forEach(function(cb){
+    cb.addEventListener('change', function(){
+      if (cb.checked) delete hidden[cb.dataset.stage];
+      else hidden[cb.dataset.stage] = 1;
+      try { localStorage.setItem(KEY, JSON.stringify(hidden)); } catch(e){}
+      apply();
+    });
+  });
+  document.getElementById('allcols').addEventListener('click', function(){
+    hidden = {};
+    try { localStorage.setItem(KEY, '{}'); } catch(e){}
+    apply();
+  });
+  apply();
+})();
+</script>
 {% endblock %}
