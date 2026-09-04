@@ -804,3 +804,10 @@ a.kpi:hover{box-shadow:0 2px 6px rgba(22,34,46,.08),0 10px 26px rgba(22,34,46,.1
   tbody tr:hover{background:none}
   @page{margin:14mm}
 }
+
+/* сохранённые фильтры реестра */
+.savedf{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line-soft)}
+.savedf-l{font-size:12.5px;font-weight:700;color:var(--muted)}
+.chip-saved{display:inline-flex;align-items:center;gap:6px}
+.chip-x{cursor:pointer;font-weight:700;opacity:.55;font-size:14px}
+.chip-x:hover{opacity:1;color:var(--crit)}

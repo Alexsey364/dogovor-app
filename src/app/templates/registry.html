@@ -57,9 +57,12 @@
       <div class="filter-foot">
         <button class="btn-sm" type="submit">Показать</button>
         <a class="btn-ghost" href="{{ url_for('registry') }}">Сбросить</a>
+        <button class="btn-ghost" type="button" id="savef">★ Сохранить как фильтр</button>
       </div>
     </form>
   </details>
+
+  <div class="savedf" id="savedf" hidden><span class="savedf-l">Мои фильтры:</span></div>
 
   <div class="tablewrap"><table>
     <thead><tr><th>Номер</th><th>Компания</th><th>Дата</th><th>Заказчик</th><th>Объект</th><th>Сумма</th><th>Аванс</th><th>Гар.</th><th>Замеч.</th><th>Стадия</th></tr></thead>
@@ -82,4 +85,40 @@
   </table></div>
   {% if not rows %}<div class="empty muted">Ничего не найдено. Измените условия поиска.</div>{% endif %}
 </div>
+
+<script>
+(function(){
+  var KEY = 'registry_saved_filters';
+  var bar = document.getElementById('savedf');
+  var saveBtn = document.getElementById('savef');
+  function load(){ try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e){ return []; } }
+  function store(v){ try { localStorage.setItem(KEY, JSON.stringify(v)); } catch(e){} }
+  function render(){
+    var items = load();
+    bar.querySelectorAll('.chip-saved').forEach(function(n){ n.remove(); });
+    if(!items.length){ bar.hidden = true; return; }
+    bar.hidden = false;
+    items.forEach(function(it, i){
+      var a = document.createElement('a');
+      a.className = 'chip chip-saved' + (location.search === it.q ? ' on' : '');
+      a.href = 'registry' + (it.q || '');
+      a.textContent = it.name;
+      var x = document.createElement('span');
+      x.className = 'chip-x'; x.textContent = '×'; x.title = 'Удалить фильтр';
+      x.onclick = function(e){ e.preventDefault(); e.stopPropagation();
+        var arr = load(); arr.splice(i,1); store(arr); render(); };
+      a.appendChild(x);
+      bar.appendChild(a);
+    });
+  }
+  if(saveBtn) saveBtn.addEventListener('click', function(){
+    var name = prompt('Название фильтра:', document.getElementById('cp') ? '' : 'Мой фильтр');
+    if(!name) return;
+    var arr = load();
+    arr.push({ name: name.slice(0,40), q: location.search });
+    store(arr); render();
+  });
+  render();
+})();
+</script>
 {% endblock %}
