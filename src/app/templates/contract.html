@@ -37,6 +37,11 @@
     </form>
     {% endif %}
     {% if can('edit_contract') %}<a class="btn-ghost" href="{{ url_for('contract_edit', cid=c.id) }}">Редактировать</a>{% endif %}
+    {% if can('create_contract') %}
+    <form method="post" action="{{ url_for('contract_copy', cid=c.id) }}" class="inline">
+      <button class="btn-ghost" type="submit" title="Создать копию: заведётся черновик с этими же условиями">Копировать</button>
+    </form>
+    {% endif %}
     {% if can('view_journal') %}<a class="btn-ghost" href="{{ url_for('contract_history', cid=c.id) }}">История</a>{% endif %}
     <button class="btn-ghost btn-print" type="button" onclick="window.print()">Печать / PDF</button>
   </div>

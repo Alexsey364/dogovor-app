@@ -1385,24 +1385,63 @@ def contract_edit(cid):
         abort(404)
     types = db.query("SELECT code, name FROM contract_types ORDER BY name")
     companies = db.query("SELECT id, short_name FROM owner_companies WHERE is_active ORDER BY ord")
+    cps = db.query("SELECT id, name FROM counterparties ORDER BY name")
+    obj = db.query_one("SELECT address FROM objects WHERE id=%s", (c["object_id"],)) if c.get("object_id") else None
+    c = dict(c)
+    c["object_address"] = obj["address"] if obj else ""
     if request.method == "POST":
         f = request.form
         amount = f.get("amount") or None
         adv = f.get("advance_pct") or None
         advance_amount = round(float(amount) * float(adv) / 100, 2) if (amount and adv) else None
+        # объект (адрес) — найти или создать
+        address = (f.get("address") or "").strip()
+        obj_id = c["object_id"]
+        if address:
+            row = db.query_one("SELECT id FROM objects WHERE address=%s", (address,))
+            obj_id = row["id"] if row else db.query_one(
+                "INSERT INTO objects(address) VALUES(%s) RETURNING id", (address,))["id"]
+        elif not address:
+            obj_id = None
+        number = (f.get("number_text") or "").strip() or c["number_text"]
         db.execute("""
-            UPDATE contracts SET subject=%s, type_code=%s, owner_company_id=%s,
-                amount=%s, advance_pct=%s, advance_amount=%s,
+            UPDATE contracts SET number_text=%s, subject=%s, type_code=%s, owner_company_id=%s,
+                counterparty_id=%s, object_id=%s, amount=%s, advance_pct=%s, advance_amount=%s,
                 warranty_months=%s, commissioning_date=%s, signed_on=%s,
                 has_penalty=%s, updated_at=now() WHERE id=%s""",
-            (f.get("subject"), f.get("type_code") or c["type_code"],
-             f.get("owner_company_id") or None, amount, adv, advance_amount,
-             f.get("warranty_months") or None, f.get("commissioning_date") or None,
-             f.get("signed_on") or None, f.get("has_penalty") == "on", cid))
+            (number, f.get("subject"), f.get("type_code") or c["type_code"],
+             f.get("owner_company_id") or None, f.get("counterparty_id") or None, obj_id,
+             amount, adv, advance_amount, f.get("warranty_months") or None,
+             f.get("commissioning_date") or None, f.get("signed_on") or None,
+             f.get("has_penalty") == "on", cid))
         audit("edit", "contract", cid)
         flash("Договор сохранён")
         return redirect(url_for("contract", cid=cid))
-    return render_template("contract_edit.html", c=c, types=types, companies=companies)
+    return render_template("contract_edit.html", c=c, types=types, companies=companies, cps=cps)
+
+
+@app.route("/contract/<int:cid>/copy", methods=["POST"])
+@login_required
+def contract_copy(cid):
+    if not can("create_contract"):
+        abort(403)
+    src = db.query_one("SELECT * FROM contracts WHERE id=%s", (cid,))
+    if not src:
+        abort(404)
+    num = next_number()
+    new_id = db.query_one("""
+        INSERT INTO contracts(number_text, type_code, owner_company_id, counterparty_id,
+            object_id, subject, amount, advance_pct, advance_amount, warranty_months,
+            has_penalty, stage, created_by)
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'draft',%s) RETURNING id""",
+        (num, src["type_code"], src["owner_company_id"], src["counterparty_id"],
+         src["object_id"], src["subject"], src["amount"], src["advance_pct"],
+         src["advance_amount"], src["warranty_months"], src["has_penalty"],
+         g.user["id"]))["id"]
+    audit("copy", "contract", new_id, after={"from": src["number_text"], "number": num})
+    flash(f"Создана копия {num} из {src['number_text']}. Измените заказчика, адрес, "
+          f"номер и другие поля.")
+    return redirect(url_for("contract_edit", cid=new_id))
 
 
 @app.route("/contract/<int:cid>/execution", methods=["POST"])
@@ -1931,36 +1970,59 @@ XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 def reports():
     if not can("reports"):
         abort(403)
-    by_month = db.query("""
-        SELECT to_char(date_trunc('month', signed_on), 'MM.YY') AS m,
-               count(*) AS n, coalesce(sum(amount),0) AS total
-        FROM contracts
-        WHERE signed_on IS NOT NULL
-          AND signed_on >= (date_trunc('month', current_date) - interval '11 months')::date
-        GROUP BY date_trunc('month', signed_on)
-        ORDER BY date_trunc('month', signed_on)
-    """)
-    by_type = db.query("""
+    fy = request.args.get("year") or ""
+    yflt = ""
+    yp = ()
+    if fy.isdigit():
+        yflt = " AND extract(year from {col})=%s"
+        yp = (int(fy),)
+    if fy.isdigit():
+        by_month = db.query("""
+            SELECT to_char(date_trunc('month', signed_on), 'MM.YY') AS m,
+                   count(*) AS n, coalesce(sum(amount),0) AS total
+            FROM contracts
+            WHERE signed_on IS NOT NULL AND extract(year from signed_on)=%s
+            GROUP BY date_trunc('month', signed_on)
+            ORDER BY date_trunc('month', signed_on)
+        """, yp)
+    else:
+        by_month = db.query("""
+            SELECT to_char(date_trunc('month', signed_on), 'MM.YY') AS m,
+                   count(*) AS n, coalesce(sum(amount),0) AS total
+            FROM contracts
+            WHERE signed_on IS NOT NULL
+              AND signed_on >= (date_trunc('month', current_date) - interval '11 months')::date
+            GROUP BY date_trunc('month', signed_on)
+            ORDER BY date_trunc('month', signed_on)
+        """)
+    by_type = db.query(f"""
         SELECT coalesce(ct.name,'—') AS name, count(*) AS n, coalesce(sum(c.amount),0) AS total
         FROM contracts c LEFT JOIN contract_types ct ON ct.code=c.type_code
+        WHERE 1=1{yflt.format(col='c.signed_on')}
         GROUP BY ct.name ORDER BY sum(c.amount) DESC NULLS LAST
-    """)
-    by_cp = db.query("""
+    """, yp)
+    by_cp = db.query(f"""
         SELECT coalesce(cp.name,'—') AS name, count(*) AS n, coalesce(sum(c.amount),0) AS total
         FROM contracts c LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        WHERE 1=1{yflt.format(col='c.signed_on')}
         GROUP BY cp.name ORDER BY sum(c.amount) DESC NULLS LAST LIMIT 8
-    """)
+    """, yp)
     by_stage = {r["stage"]: r["n"] for r in db.query(
-        "SELECT stage, count(*) AS n FROM contracts GROUP BY stage")}
-    totals = db.query_one("""
+        f"SELECT stage, count(*) AS n FROM contracts c WHERE 1=1{yflt.format(col='signed_on')} "
+        f"GROUP BY stage", yp)}
+    totals = db.query_one(f"""
         SELECT count(*) AS n, coalesce(sum(amount),0) AS total,
           coalesce(avg(amount),0) AS avg_amount,
           count(*) FILTER (WHERE EXISTS (SELECT 1 FROM review_findings rf
              WHERE rf.contract_id=contracts.id AND rf.resolution IS NULL)) AS with_findings
-        FROM contracts
-    """) or {}
+        FROM contracts WHERE 1=1{yflt.format(col='signed_on')}
+    """, yp) or {}
+    years = [r["y"] for r in db.query(
+        "SELECT DISTINCT extract(year from signed_on)::int AS y FROM contracts "
+        "WHERE signed_on IS NOT NULL ORDER BY y DESC")]
     return render_template("reports.html", by_month=by_month, by_type=by_type,
-                           by_cp=by_cp, by_stage=by_stage, totals=totals)
+                           by_cp=by_cp, by_stage=by_stage, totals=totals,
+                           years=years, cur_year=fy)
 
 
 @app.route("/export/registry.xlsx")

@@ -2,6 +2,15 @@
 {% block crumb %}Отчёты и аналитика{% endblock %}
 {% block body %}
 
+<div class="card" style="padding:0">
+  <div class="card-h"><h2>Год</h2>
+    <div class="filters">
+      <a class="chip {{ 'on' if not cur_year }}" href="{{ url_for('reports') }}">Все годы</a>
+      {% for y in years %}<a class="chip {{ 'on' if cur_year==y|string }}" href="{{ url_for('reports', year=y) }}">{{ y }}</a>{% endfor %}
+    </div>
+  </div>
+</div>
+
 <div class="kpis">
   <div class="kpi"><span class="badge b-acc">{{ ic('doc') }}</span>
     <div><div class="v">{{ totals.n }}</div><div class="l">договоров всего</div></div></div>

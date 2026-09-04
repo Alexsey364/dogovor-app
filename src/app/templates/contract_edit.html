@@ -15,6 +15,14 @@
         {% for t in types %}<option value="{{ t.code }}"{{ ' selected' if c.type_code==t.code }}>{{ t.name }}</option>{% endfor %}
       </select>
     </label>
+    <label>Номер договора<input name="number_text" value="{{ c.number_text or '' }}"></label>
+    <label>Заказчик
+      <select name="counterparty_id">
+        <option value="">— не указан —</option>
+        {% for cp in cps %}<option value="{{ cp.id }}"{{ ' selected' if c.counterparty_id==cp.id }}>{{ cp.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="wide">Объект (адрес)<input name="address" value="{{ c.object_address or '' }}"></label>
     <label class="wide">Предмет договора<input name="subject" value="{{ c.subject or '' }}" required></label>
     <label>Сумма, ₽<input name="amount" type="number" step="0.01" value="{{ c.amount or '' }}"></label>
     <label>Аванс, %<input name="advance_pct" type="number" step="1" min="0" max="100" value="{{ (c.advance_pct|round|int) if c.advance_pct else '' }}"></label>
