@@ -565,7 +565,7 @@ tr.task-done td:nth-child(2){text-decoration:line-through}
 .nav a.on b{color:var(--accent-ink);background:rgba(31,95,115,.12)}
 .nav a.on b.hot{background:var(--crit);color:#fff}
 /* цвета плиток по разделам */
-.t-home,.t-plus,.t-user{background:var(--accent-soft);color:var(--accent)}
+.t-home,.t-plus,.t-user,.t-doc{background:var(--accent-soft);color:var(--accent)}
 .t-board,.t-list,.t-key{background:var(--info-soft);color:var(--info)}
 .t-clock,.t-pay{background:var(--warn-soft);color:var(--warn)}
 .t-task,.t-users,.t-award{background:var(--violet-soft);color:var(--violet)}

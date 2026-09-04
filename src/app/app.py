@@ -26,6 +26,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import db
 import review_engine
 import text_extract
+import doc_builder
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
@@ -1168,6 +1169,46 @@ def user_edit(uid):
                 flash("Пользователь сохранён")
                 return redirect(url_for("users"))
     return render_template("user_edit.html", u=u, depts=depts, roles=roles)
+
+
+@app.route("/build", methods=["GET", "POST"])
+@login_required
+def build_contract():
+    """Конструктор договора: собирает готовый .docx с реквизитами."""
+    if not can("create_contract"):
+        abort(403)
+    import datetime as _dt
+    companies = db.query("SELECT * FROM owner_companies WHERE is_active ORDER BY ord")
+    cps = db.query("SELECT id, name FROM counterparties ORDER BY name")
+    kinds = db.query("SELECT code, name, default_advance_pct, warranty_months "
+                     "FROM contract_types ORDER BY name")
+    if request.method == "POST":
+        owner = db.query_one("SELECT * FROM owner_companies WHERE id=%s",
+                             (request.form.get("owner_company_id") or 0,))
+        cp = db.query_one("SELECT * FROM counterparties WHERE id=%s",
+                          (request.form.get("counterparty_id") or 0,))
+        if not owner or not cp:
+            flash("Выберите нашу компанию и заказчика из реестра")
+            return redirect(url_for("build_contract"))
+        kind = request.form.get("kind") or "poverka"
+        number = (request.form.get("number") or "").strip() or next_number()
+        sign_date = request.form.get("signed_on") or _dt.date.today().isoformat()
+        terms = {
+            "amount": request.form.get("amount") or None,
+            "advance_pct": request.form.get("advance_pct") or None,
+            "warranty_months": request.form.get("warranty_months") or None,
+            "deadline_days": request.form.get("deadline_days") or None,
+            "subject": request.form.get("subject") or "",
+        }
+        bio = doc_builder.build(kind, number, sign_date, dict(owner), dict(cp), terms)
+        audit("build_doc", "counterparty", cp["id"],
+              after={"number": number, "kind": kind})
+        fname = ("Dogovor_" + number + ".docx").replace(" ", "_").replace("/", "-")
+        return send_file(
+            bio, as_attachment=True, download_name=fname,
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    return render_template("build.html", companies=companies, cps=cps, kinds=kinds,
+                           next_num=next_number())
 
 
 @app.route("/contract/new", methods=["GET", "POST"])

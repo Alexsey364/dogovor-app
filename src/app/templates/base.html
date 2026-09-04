@@ -27,8 +27,10 @@
       <a href="{{ url_for('warranty') }}" class="{{ 'on' if request.endpoint=='warranty' }}">
         {{ ictile('shield') }}<span class="lbl">Гарантии</span><b>{{ nav.warranty if nav }}</b></a>
       {% if can('create_contract') %}
+      <a href="{{ url_for('build_contract') }}" class="{{ 'on' if request.endpoint=='build_contract' }}">
+        {{ ictile('doc') }}<span class="lbl">Собрать договор</span></a>
       <a href="{{ url_for('contract_new') }}" class="{{ 'on' if request.endpoint=='contract_new' }}">
-        {{ ictile('plus') }}<span class="lbl">Создать договор</span></a>
+        {{ ictile('plus') }}<span class="lbl">Завести договор</span></a>
       {% endif %}
 
       <div class="grp">Данные</div>

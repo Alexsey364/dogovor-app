@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block crumb %}Конструктор договора{% endblock %}
+{% block body %}
+<div class="note">Соберите готовый <b>.docx</b> за минуту: выберите нашу компанию и заказчика — реквизиты обеих сторон подставятся автоматически из реестра. Это <b>проект договора</b> с условиями в нашу пользу; перед применением его утверждает юрист.</div>
+<div class="card">
+  <div class="card-h"><h2>Собрать договор</h2></div>
+  <form method="post" class="form">
+    <label>Наша компания
+      <select name="owner_company_id" required>
+        <option value="">— выберите —</option>
+        {% for oc in companies %}<option value="{{ oc.id }}">{{ oc.short_name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Заказчик (из реестра)
+      <select name="counterparty_id" required>
+        <option value="">— выберите —</option>
+        {% for c in cps %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+      <span class="hint">Реквизиты подтянутся из карточки. Нет нужного — <a href="{{ url_for('counterparty_new') }}">добавьте заказчика</a>.</span>
+    </label>
+    <label>Вид работ
+      <select name="kind" id="kind">
+        {% for k in kinds %}<option value="{{ k.code }}"{{ ' selected' if k.code=='poverka' }} data-adv="{{ k.default_advance_pct or '' }}" data-war="{{ k.warranty_months or '' }}">{{ k.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Номер договора<input name="number" value="{{ next_num }}"></label>
+    <label>Дата подписания<input name="signed_on" type="date"></label>
+    <label class="wide">Предмет / уточнение<input name="subject" placeholder="например: поверка 3 приборов учёта тепловой энергии по адресу …"></label>
+    <label>Сумма, ₽<input name="amount" type="number" step="0.01"></label>
+    <label>Предоплата, %<input name="advance_pct" type="number" min="0" max="100" value="100"></label>
+    <label>Гарантия, дней<input name="warranty_months" type="number" value="30"></label>
+    <label>Срок, раб. дней<input name="deadline_days" type="number" value="30"></label>
+    <div class="form-foot">
+      <button class="btn" type="submit">Скачать .docx</button>
+      <a class="btn-ghost" href="{{ url_for('registry') }}">Отмена</a>
+      <span class="muted">Файл откроется в Word, LibreOffice, Google Документах</span>
+    </div>
+  </form>
+</div>
+{% endblock %}
