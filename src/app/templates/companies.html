@@ -17,6 +17,7 @@
     <div class="kv"><b>Расчётный счёт</b><span class="mono">{{ oc.bank_account or '—' }}</span></div>
     <div class="kv"><b>БИК</b><span class="mono">{{ oc.bank_bik or '—' }}</span></div>
     <div class="kv"><b>Подписант</b><span>{{ oc.signatory or '—' }}{% if oc.director %}, {{ oc.director }}{% endif %}</span></div>
+    <div class="kv"><b>Реквизиты актуальны на</b><span class="mono">{{ oc.requisites_date|dt if oc.requisites_date else '—' }}</span></div>
     <div class="doc-actions"><a class="btn-sm" href="{{ url_for('company_edit', oid=oc.id) }}">Редактировать реквизиты</a></div>
   </div>
   {% endfor %}

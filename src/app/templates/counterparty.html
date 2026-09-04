@@ -52,6 +52,7 @@
   <div class="kv"><b>Расчётный счёт</b><span class="mono">{{ cp.bank_account or '—' }}</span></div>
   <div class="kv"><b>Корр. счёт</b><span class="mono">{{ cp.corr_account or '—' }}</span></div>
   <div class="kv"><b>БИК</b><span class="mono">{{ cp.bank_bik or '—' }}</span></div>
+  <div class="kv"><b>Реквизиты актуальны на</b><span class="mono">{{ cp.requisites_date|dt if cp.requisites_date else '—' }}</span></div>
 </div>
 
 <div class="card">

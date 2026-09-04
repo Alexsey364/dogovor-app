@@ -21,9 +21,11 @@
   <div class="col stage-{{ s }}" data-stage="{{ s }}">
     <div class="col-h"><span class="t"><span class="dotstage"></span>{{ STAGE_RU[s] }}</span><span class="c" data-count="{{ s }}">{{ cols[s]|length }}</span></div>
     {% for r in cols[s] %}
-    <a class="tk stage-{{ s }}" href="{{ url_for('contract', cid=r.id) }}"
+    {% set oclass = ('owner-ip' if r.owner and 'Цыруль' in r.owner else ('owner-ooo' if r.owner else '')) %}
+    <a class="tk stage-{{ s }} {{ oclass }}" href="{{ url_for('contract', cid=r.id) }}"
        {% if can_move %}draggable="true" data-cid="{{ r.id }}" data-move="{{ url_for('contract_move', cid=r.id) }}"{% endif %}>
-      <span class="num">{{ r.number_text }}</span>
+      <span class="num">{{ r.number_text }}
+        {% if r.owner %}<span class="tk-owner {{ oclass }}">{{ 'ИП' if 'Цыруль' in r.owner else 'ООО' }}</span>{% endif %}</span>
       <span class="ttl">{{ r.counterparty or '—' }}</span>
       <span class="meta">
         <span class="mono">{{ r.stage_since|dt('%d.%m.%y') if r.stage_since else '' }}</span>

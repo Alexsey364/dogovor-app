@@ -27,6 +27,8 @@
     <label>ФИО подписанта<input name="director" value="{{ cp.director if cp and cp.director else '' }}" placeholder="Иванов Иван Иванович"></label>
     <label>Телефон<input name="phone" value="{{ cp.phone if cp and cp.phone else '' }}"></label>
     <label>E-mail<input name="email" value="{{ cp.email if cp and cp.email else '' }}"></label>
+    <label>Реквизиты актуальны на<input name="requisites_date" type="date" value="{{ cp.requisites_date|dt('%Y-%m-%d') if cp and cp.requisites_date else '' }}">
+      <span class="hint">дата последнего договора с этими реквизитами</span></label>
     <label class="wide">Заметки<input name="notes" value="{{ cp.notes if cp and cp.notes else '' }}"></label>
 
     <div class="form-foot">

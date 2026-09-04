@@ -346,11 +346,13 @@ def index():
 def board():
     rows = db.query("""
         SELECT c.id, c.number_text, c.subject, c.amount, c.stage, c.stage_since,
-               cp.name AS counterparty,
+               cp.name AS counterparty, oc.short_name AS owner,
                (SELECT count(*) FROM review_findings rf
                  WHERE rf.contract_id=c.id AND rf.resolution IS NULL
                    AND rf.severity='critical') AS crit
-        FROM contracts c LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        FROM contracts c
+        LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         ORDER BY c.stage_since DESC NULLS LAST, c.id DESC
     """)
     cols = {s: [] for s in STAGE_ORDER}
@@ -811,7 +813,7 @@ def counterparties():
 
 CP_FIELDS = ["name", "short_name", "kind", "inn", "kpp", "ogrn", "address",
              "bank_name", "bank_bik", "bank_account", "corr_account",
-             "director", "signatory", "phone", "email", "notes"]
+             "director", "signatory", "phone", "email", "requisites_date", "notes"]
 
 
 def _cp_form():
@@ -877,7 +879,7 @@ def counterparty_edit(pid):
 
 OC_FIELDS = ["name", "short_name", "inn", "kpp", "ogrn", "address",
              "bank_name", "bank_bik", "bank_account", "corr_account",
-             "director", "signatory", "phone", "email"]
+             "director", "signatory", "phone", "email", "requisites_date"]
 
 
 @app.route("/companies")

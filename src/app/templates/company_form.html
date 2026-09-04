@@ -22,6 +22,7 @@
     <label>ФИО руководителя<input name="director" value="{{ oc.director or '' }}"></label>
     <label>Телефон<input name="phone" value="{{ oc.phone or '' }}"></label>
     <label>E-mail<input name="email" value="{{ oc.email or '' }}"></label>
+    <label>Реквизиты актуальны на<input name="requisites_date" type="date" value="{{ oc.requisites_date|dt('%Y-%m-%d') if oc.requisites_date else '' }}"></label>
 
     <div class="form-foot">
       <button class="btn-sm" type="submit">Сохранить</button>
