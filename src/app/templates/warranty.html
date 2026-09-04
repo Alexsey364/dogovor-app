@@ -8,11 +8,12 @@
 <div class="card">
   <div class="card-h"><h2>{{ rows|length }} объектов на гарантии</h2></div>
   <div class="tablewrap"><table>
-    <thead><tr><th>Договор</th><th>Заказчик</th><th>Объект</th><th>Гарантия</th><th>Дата ввода</th><th>Действует до</th></tr></thead>
+    <thead><tr><th>Договор</th><th>Комп.</th><th>Заказчик</th><th>Объект</th><th>Гарантия</th><th>Дата ввода</th><th>Действует до</th></tr></thead>
     <tbody>
       {% for r in rows %}
       <tr onclick="location='{{ url_for('contract', cid=r.id) }}'">
         <td class="mono">{{ r.number_text }}</td>
+        <td>{{ owner_tag(r.owner) }}</td>
         <td>{{ r.counterparty or '—' }}</td>
         <td class="muted">{{ (r.object or '—')|truncate(30) }}</td>
         <td class="mono">{% if r.warranty_months >= 60 %}<span class="pill crit">{{ r.warranty_months }} мес.</span>{% else %}{{ r.warranty_months }} мес.{% endif %}</td>

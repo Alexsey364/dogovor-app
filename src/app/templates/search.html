@@ -9,7 +9,7 @@
     <tbody>
       {% for r in rows %}
       <tr onclick="location='{{ url_for('contract', cid=r.id) }}'">
-        <td class="mono">{{ r.number_text }}</td>
+        <td class="mono">{{ r.number_text }} {{ owner_tag(r.owner) }}</td>
         <td class="mono">{{ r.signed_on|dt('%d.%m.%y') }}</td>
         <td>{{ r.counterparty or '—' }}{% if r.in_text %} <span class="pill">в тексте</span>{% endif %}</td>
         <td class="muted">{{ (r.object or '—')|truncate(30) }}</td>

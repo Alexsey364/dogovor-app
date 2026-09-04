@@ -99,6 +99,16 @@ def ictile(name):
                   f'aria-hidden="true">{_ICONS.get(name, "")}</svg></span>')
 
 
+def owner_tag(name):
+    """Компактный значок компании-владельца ИП/ООО для списков."""
+    if not name:
+        return Markup("")
+    ip = "Цыруль" in name
+    cls = "owner-ip" if ip else "owner-ooo"
+    label = "ИП" if ip else "ООО"
+    return Markup(f'<span class="pill {cls}" title="{name}">{label}</span>')
+
+
 def asset_ver():
     """Версия статики по времени изменения style.css — чтобы браузер
     подхватывал новый CSS сам, без Ctrl+F5."""
@@ -110,7 +120,7 @@ def asset_ver():
 
 app.jinja_env.globals.update(FILE_KIND_RU=FILE_KIND_RU, FILE_KINDS=FILE_KINDS,
                              human_size=human_size, ic=ic, ictile=ictile,
-                             asset_ver=asset_ver)
+                             asset_ver=asset_ver, owner_tag=owner_tag)
 app.jinja_env.globals.update(STAGE_RU=STAGE_RU, SEV_RU=SEV_RU, KIND_RU=KIND_RU,
                              STAGE_ORDER=["draft", "internal_review", "legal_review",
                                           "at_counterparty", "in_progress", "completed",
@@ -638,11 +648,13 @@ def tasks_page():
     rows = db.query(f"""
         SELECT t.id, t.title, t.due_on, t.priority, t.is_done, t.contract_id,
                (t.due_on - current_date) AS days_left,
-               a.full_name AS assignee, c.number_text, cp.name AS counterparty
+               a.full_name AS assignee, c.number_text, cp.name AS counterparty,
+               oc.short_name AS owner
         FROM tasks t
         LEFT JOIN users a ON a.id=t.assignee_id
         LEFT JOIN contracts c ON c.id=t.contract_id
         LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         WHERE {where}
         ORDER BY t.is_done, t.due_on NULLS LAST, t.priority DESC, t.id
     """, tuple(params))
@@ -675,9 +687,11 @@ def payments_page():
         where = "p.paid_on IS NOT NULL"
     rows = db.query(f"""
         SELECT p.id, p.kind, p.direction, p.planned_on, p.amount, p.paid_on,
-               p.condition, c.id AS cid, c.number_text, cp.name AS counterparty
+               p.condition, c.id AS cid, c.number_text, cp.name AS counterparty,
+               oc.short_name AS owner
         FROM payments p JOIN contracts c ON c.id=p.contract_id
         LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         WHERE {where}
         ORDER BY p.planned_on NULLS LAST, p.id
     """)
@@ -785,9 +799,10 @@ def counterparty(pid):
     """, (pid, pid)) or {}
     contracts = db.query("""
         SELECT c.id, c.number_text, c.subject, c.amount, c.stage, c.signed_on,
-               o.address AS object,
+               o.address AS object, oc.short_name AS owner,
                (SELECT count(*) FROM review_findings rf WHERE rf.contract_id=c.id AND rf.resolution IS NULL) AS findings
         FROM contracts c LEFT JOIN objects o ON o.id=c.object_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         WHERE c.counterparty_id=%s ORDER BY c.number_text DESC
     """, (pid,))
     total = m.get("total") or 0
@@ -926,10 +941,11 @@ def warranty():
     rows = db.query("""
         SELECT c.id, c.number_text, c.warranty_months, c.warranty_until,
                c.commissioning_date, c.type_code, cp.name AS counterparty,
-               o.address AS object
+               o.address AS object, oc.short_name AS owner
         FROM contracts c
         LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
         LEFT JOIN objects o ON o.id=c.object_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         WHERE c.warranty_months IS NOT NULL
         ORDER BY c.warranty_months DESC, c.number_text
     """)
@@ -1426,7 +1442,7 @@ def search():
         like = f"%{q}%"
         rows = db.query("""
             SELECT c.id, c.number_text, c.subject, c.amount, c.stage, c.signed_on,
-                   cp.name AS counterparty, o.address AS object,
+                   cp.name AS counterparty, o.address AS object, oc.short_name AS owner,
                    (SELECT count(*) FROM review_findings rf
                      WHERE rf.contract_id=c.id AND rf.resolution IS NULL) AS findings,
                    EXISTS (SELECT 1 FROM contract_files cf
@@ -1435,6 +1451,7 @@ def search():
             FROM contracts c
             LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
             LEFT JOIN objects o ON o.id=c.object_id
+            LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
             WHERE c.number_text ILIKE %s OR c.subject ILIKE %s
                OR cp.name ILIKE %s OR o.address ILIKE %s
                OR c.external_number ILIKE %s
@@ -1662,9 +1679,10 @@ def deadlines():
         pays = db.query("""
             SELECT p.id, p.kind, p.direction, p.planned_on, p.amount, p.condition,
                    (p.planned_on - current_date) AS days_left,
-                   c.id AS cid, c.number_text, cp.name AS counterparty
+                   c.id AS cid, c.number_text, cp.name AS counterparty, oc.short_name AS owner
             FROM payments p JOIN contracts c ON c.id=p.contract_id
             LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+            LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
             WHERE p.paid_on IS NULL AND p.planned_on IS NOT NULL
               AND p.planned_on <= current_date + 14
               AND c.stage NOT IN ('archived','cancelled')
@@ -1674,10 +1692,11 @@ def deadlines():
     warr = db.query("""
         SELECT c.id AS cid, c.number_text, c.warranty_until,
                (c.warranty_until - current_date) AS days_left,
-               cp.name AS counterparty, o.address AS object_address
+               cp.name AS counterparty, o.address AS object_address, oc.short_name AS owner
         FROM contracts c
         LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
         LEFT JOIN objects o ON o.id=c.object_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         WHERE c.warranty_until IS NOT NULL
           AND c.warranty_until BETWEEN current_date - 30 AND current_date + 60
         ORDER BY c.warranty_until
@@ -1687,9 +1706,10 @@ def deadlines():
         SELECT c.id AS cid, c.number_text, c.valid_to, c.auto_renewal,
                c.renewal_notice_days,
                (c.valid_to - current_date) AS days_left,
-               cp.name AS counterparty
+               cp.name AS counterparty, oc.short_name AS owner
         FROM contracts c
         LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         WHERE c.valid_to IS NOT NULL
           AND c.valid_to BETWEEN current_date AND current_date + 45
           AND c.stage NOT IN ('archived','cancelled')
@@ -1699,9 +1719,10 @@ def deadlines():
     stg = db.query("""
         SELECT s.id, s.name, s.volume, s.planned_on, s.amount,
                (s.planned_on - current_date) AS days_left,
-               c.id AS cid, c.number_text, cp.name AS counterparty
+               c.id AS cid, c.number_text, cp.name AS counterparty, oc.short_name AS owner
         FROM stages s JOIN contracts c ON c.id=s.contract_id
         LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         WHERE s.is_done = false AND s.planned_on IS NOT NULL
           AND s.planned_on <= current_date + 14
           AND c.stage NOT IN ('archived','cancelled')
@@ -1716,11 +1737,12 @@ def deadlines():
             SELECT t.id, t.title, t.due_on, t.priority,
                    (t.due_on - current_date) AS days_left,
                    a.full_name AS assignee, c.id AS cid, c.number_text,
-                   cp.name AS counterparty
+                   cp.name AS counterparty, oc.short_name AS owner
             FROM tasks t
             LEFT JOIN users a ON a.id=t.assignee_id
             LEFT JOIN contracts c ON c.id=t.contract_id
             LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+            LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
             WHERE t.is_done = false AND t.due_on IS NOT NULL
               AND t.due_on <= current_date + 14 {mine}
             ORDER BY t.due_on

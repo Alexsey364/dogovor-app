@@ -25,7 +25,7 @@
           </form>
         </td>
         <td>{{ t.title }}{% if t.priority == 'high' and not t.is_done %} <span class="pill crit">важно</span>{% endif %}</td>
-        <td class="mono"><a class="who-link" href="{{ url_for('contract', cid=t.contract_id) }}">{{ t.number_text or '—' }}</a></td>
+        <td class="mono"><a class="who-link" href="{{ url_for('contract', cid=t.contract_id) }}">{{ t.number_text or '—' }}</a> {{ owner_tag(t.owner) }}</td>
         <td>{{ t.counterparty or '—' }}</td>
         <td>{{ t.assignee or '—' }}</td>
         <td class="mono">

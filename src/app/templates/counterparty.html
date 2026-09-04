@@ -62,7 +62,7 @@
     <tbody>
       {% for c in contracts %}
       <tr onclick="location='{{ url_for('contract', cid=c.id) }}'">
-        <td class="mono">{{ c.number_text }}</td>
+        <td class="mono">{{ c.number_text }} {{ owner_tag(c.owner) }}</td>
         <td class="mono">{{ c.signed_on|dt('%d.%m.%y') }}</td>
         <td>{{ c.subject|truncate(34) }}</td>
         <td class="muted">{{ (c.object or '—')|truncate(24) }}</td>

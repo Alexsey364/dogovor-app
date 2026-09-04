@@ -22,7 +22,7 @@
       <tr onclick="location='{{ url_for('contract', cid=r.cid) }}'"
           class="{{ 'pay-overdue' if not r.paid_on and r.planned_on and r.planned_on < today }}">
         <td class="mono">{{ r.planned_on|dt('%d.%m.%y') if r.planned_on else '—' }}</td>
-        <td class="mono">{{ r.number_text }}</td>
+        <td class="mono">{{ r.number_text }} {{ owner_tag(r.owner) }}</td>
         <td>{{ r.counterparty or '—' }}</td>
         <td>{{ PAY_KIND_RU.get(r.kind, r.kind) }}</td>
         <td class="muted">{{ DIR_RU.get(r.direction, r.direction) }}</td>
