@@ -2,13 +2,17 @@
 {% block crumb %}Контрагенты{% endblock %}
 {% block body %}
 <div class="card">
-  <div class="card-h"><h2>{{ rows|length }} организаций</h2></div>
+  <div class="card-h"><h2>{{ rows|length }} организаций</h2>
+    {% if can('create_contract') or can('edit_contract') %}
+    <a class="btn-sm" href="{{ url_for('counterparty_new') }}">+ Заказчик</a>{% endif %}
+  </div>
   <div class="tablewrap"><table>
-    <thead><tr><th>Организация</th><th>Тип</th><th>Договоров</th><th>Сумма</th><th>Аннулировано</th></tr></thead>
+    <thead><tr><th>Организация</th><th>ИНН</th><th>Тип</th><th>Договоров</th><th>Сумма</th><th>Аннулировано</th></tr></thead>
     <tbody>
       {% for r in rows %}
       <tr onclick="location='{{ url_for('counterparty', pid=r.id) }}'" style="cursor:pointer">
         <td>{{ r.name }}</td>
+        <td class="mono muted">{{ r.inn or '—' }}</td>
         <td><span class="pill">{{ KIND_RU.get(r.kind, r.kind) }}</span></td>
         <td class="mono">{{ r.n }}</td>
         <td class="mono">{{ r.total|money }}</td>

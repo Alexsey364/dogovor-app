@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block crumb %}Наши компании{% endblock %}
+{% block body %}
+<div class="note">Реквизиты этих компаний подставляются в договоры. Вся работа ведётся от одной из них.</div>
+<div class="grid2">
+  {% for oc in rows %}
+  <div class="card">
+    <div class="doc-h">
+      <div>
+        <h2>{{ oc.name }}</h2>
+        <div class="sub">{% if oc.inn %}ИНН {{ oc.inn }}{% endif %}{% if oc.kpp %} · КПП {{ oc.kpp }}{% endif %}
+          {% if oc.address %}<br>{{ oc.address }}{% endif %}</div>
+      </div>
+      <span class="pill owner-{{ 'ip' if 'Цыруль' in oc.name else 'ooo' }}">{{ oc.n }} дог.</span>
+    </div>
+    <div class="kv"><b>Банк</b><span>{{ oc.bank_name or '—' }}</span></div>
+    <div class="kv"><b>Расчётный счёт</b><span class="mono">{{ oc.bank_account or '—' }}</span></div>
+    <div class="kv"><b>БИК</b><span class="mono">{{ oc.bank_bik or '—' }}</span></div>
+    <div class="kv"><b>Подписант</b><span>{{ oc.signatory or '—' }}{% if oc.director %}, {{ oc.director }}{% endif %}</span></div>
+    <div class="doc-actions"><a class="btn-sm" href="{{ url_for('company_edit', oid=oc.id) }}">Редактировать реквизиты</a></div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

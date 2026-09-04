@@ -799,14 +799,119 @@ def counterparty(pid):
 @login_required
 def counterparties():
     rows = db.query("""
-        SELECT cp.id, cp.name, cp.kind, count(c.id) AS n,
+        SELECT cp.id, cp.name, cp.kind, cp.inn, count(c.id) AS n,
                coalesce(sum(c.amount),0) AS total,
                count(*) FILTER (WHERE c.stage='cancelled') AS cancelled
         FROM counterparties cp LEFT JOIN contracts c ON c.counterparty_id=cp.id
-        GROUP BY cp.id, cp.name, cp.kind
+        GROUP BY cp.id, cp.name, cp.kind, cp.inn
         ORDER BY count(c.id) DESC, cp.name
     """)
     return render_template("counterparties.html", rows=rows)
+
+
+CP_FIELDS = ["name", "short_name", "kind", "inn", "kpp", "ogrn", "address",
+             "bank_name", "bank_bik", "bank_account", "corr_account",
+             "director", "signatory", "phone", "email", "notes"]
+
+
+def _cp_form():
+    d = {}
+    for f in CP_FIELDS:
+        v = (request.form.get(f) or "").strip()
+        d[f] = v or None
+    if d["kind"] not in KIND_RU:
+        d["kind"] = "commercial"
+    return d
+
+
+def _can_manage_cp():
+    return can("create_contract") or can("edit_contract")
+
+
+@app.route("/counterparty/new", methods=["GET", "POST"])
+@login_required
+def counterparty_new():
+    if not _can_manage_cp():
+        abort(403)
+    if request.method == "POST":
+        d = _cp_form()
+        if not d["name"]:
+            flash("Название обязательно")
+        else:
+            cols = ", ".join(CP_FIELDS)
+            ph = ", ".join(["%s"] * len(CP_FIELDS))
+            row = db.query_one(
+                f"INSERT INTO counterparties({cols}) VALUES({ph}) RETURNING id",
+                tuple(d[f] for f in CP_FIELDS))
+            audit("cp_new", "counterparty", row["id"], after={"name": d["name"]})
+            flash("Заказчик добавлен")
+            return redirect(url_for("counterparty", pid=row["id"]))
+    return render_template("counterparty_form.html", cp=None)
+
+
+@app.route("/counterparty/<int:pid>/edit", methods=["GET", "POST"])
+@login_required
+def counterparty_edit(pid):
+    if not _can_manage_cp():
+        abort(403)
+    cp = db.query_one("SELECT * FROM counterparties WHERE id=%s", (pid,))
+    if not cp:
+        abort(404)
+    if request.method == "POST":
+        d = _cp_form()
+        if not d["name"]:
+            flash("Название обязательно")
+        else:
+            sets = ", ".join(f"{f}=%s" for f in CP_FIELDS)
+            db.execute(f"UPDATE counterparties SET {sets} WHERE id=%s",
+                       tuple(d[f] for f in CP_FIELDS) + (pid,))
+            audit("cp_edit", "counterparty", pid, after={"name": d["name"]})
+            flash("Реквизиты сохранены")
+            return redirect(url_for("counterparty", pid=pid))
+    return render_template("counterparty_form.html", cp=cp)
+
+
+# ------------------------------------------------------------------
+#  Наши компании (владельцы договоров) и их реквизиты
+# ------------------------------------------------------------------
+
+OC_FIELDS = ["name", "short_name", "inn", "kpp", "ogrn", "address",
+             "bank_name", "bank_bik", "bank_account", "corr_account",
+             "director", "signatory", "phone", "email"]
+
+
+@app.route("/companies")
+@login_required
+def companies():
+    if not can("manage_companies"):
+        abort(403)
+    rows = db.query("""
+        SELECT oc.*, (SELECT count(*) FROM contracts c WHERE c.owner_company_id=oc.id) AS n
+        FROM owner_companies oc ORDER BY oc.ord, oc.id
+    """)
+    return render_template("companies.html", rows=rows)
+
+
+@app.route("/company/<int:oid>/edit", methods=["GET", "POST"])
+@login_required
+def company_edit(oid):
+    if not can("manage_companies"):
+        abort(403)
+    oc = db.query_one("SELECT * FROM owner_companies WHERE id=%s", (oid,))
+    if not oc:
+        abort(404)
+    if request.method == "POST":
+        d = {f: (request.form.get(f) or "").strip() or None for f in OC_FIELDS}
+        if not d["name"]:
+            flash("Название обязательно")
+        else:
+            sets = ", ".join(f"{f}=%s" for f in OC_FIELDS)
+            db.execute(f"UPDATE owner_companies SET {sets} WHERE id=%s",
+                       tuple(d[f] for f in OC_FIELDS) + (oid,))
+            audit("company_edit", "owner_company", oid, after={"name": d["name"]})
+            flash("Реквизиты компании сохранены")
+            return redirect(url_for("companies"))
+    return render_template("company_form.html", oc=oc)
 
 
 # ------------------------------------------------------------------

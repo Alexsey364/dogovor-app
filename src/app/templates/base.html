@@ -45,8 +45,12 @@
         {{ ictile('pay') }}<span class="lbl">Платежи</span></a>
       {% endif %}
 
-      {% if can('manage_users') or can('manage_permissions') %}
+      {% if can('manage_users') or can('manage_permissions') or can('manage_companies') %}
       <div class="grp">Настройка</div>
+      {% if can('manage_companies') %}
+      <a href="{{ url_for('companies') }}" class="{{ 'on' if request.endpoint in ('companies','company_edit') }}">
+        {{ ictile('flag') }}<span class="lbl">Наши компании</span></a>
+      {% endif %}
       {% if can('manage_users') %}
       <a href="{{ url_for('users') }}" class="{{ 'on' if request.endpoint in ('users','user_new') }}">
         {{ ictile('user') }}<span class="lbl">Пользователи</span><b>{{ nav.users if nav }}</b></a>

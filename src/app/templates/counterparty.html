@@ -33,6 +33,25 @@
   {% if m.cancelled %}
   <div class="legend">Надёжность = доля не аннулированных договоров. {{ m.cancelled }} из {{ m.total }} аннулировано — стоит посмотреть причины.</div>
   {% endif %}
+  {% if can('create_contract') or can('edit_contract') %}
+  <div class="doc-actions"><a class="btn-ghost" href="{{ url_for('counterparty_edit', pid=cp.id) }}">Редактировать реквизиты</a></div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Реквизиты</h2></div>
+  <div class="facts">
+    <div class="fact"><div class="k">ИНН</div><div class="v mono">{{ cp.inn or '—' }}</div></div>
+    <div class="fact"><div class="k">КПП</div><div class="v mono">{{ cp.kpp or '—' }}</div></div>
+    <div class="fact"><div class="k">ОГРН</div><div class="v mono">{{ cp.ogrn or '—' }}</div></div>
+    <div class="fact"><div class="k">Телефон</div><div class="v">{{ cp.phone or '—' }}</div></div>
+    <div class="fact"><div class="k">E-mail</div><div class="v">{{ cp.email or '—' }}</div></div>
+    <div class="fact"><div class="k">Подписант</div><div class="v">{{ cp.signatory or '—' }}{% if cp.director %}<br>{{ cp.director }}{% endif %}</div></div>
+  </div>
+  <div class="kv"><b>Банк</b><span>{{ cp.bank_name or '—' }}</span></div>
+  <div class="kv"><b>Расчётный счёт</b><span class="mono">{{ cp.bank_account or '—' }}</span></div>
+  <div class="kv"><b>Корр. счёт</b><span class="mono">{{ cp.corr_account or '—' }}</span></div>
+  <div class="kv"><b>БИК</b><span class="mono">{{ cp.bank_bik or '—' }}</span></div>
 </div>
 
 <div class="card">

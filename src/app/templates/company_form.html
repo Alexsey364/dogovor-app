@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ url_for('companies') }}">Наши компании</a> · {{ oc.short_name or oc.name }}{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h"><h2>Реквизиты · {{ oc.name }}</h2></div>
+  <form method="post" class="form">
+    <label class="wide">Полное наименование<input name="name" required value="{{ oc.name }}"></label>
+    <label>Краткое название<input name="short_name" value="{{ oc.short_name or '' }}"></label>
+    <label>Как подписывает<input name="signatory" value="{{ oc.signatory or '' }}" placeholder="Генеральный директор / Индивидуальный предприниматель"></label>
+    <label>ИНН<input name="inn" value="{{ oc.inn or '' }}" inputmode="numeric"></label>
+    <label>КПП<input name="kpp" value="{{ oc.kpp or '' }}" inputmode="numeric"></label>
+    <label>ОГРН / ОГРНИП<input name="ogrn" value="{{ oc.ogrn or '' }}" inputmode="numeric"></label>
+    <label class="wide">Юридический адрес<input name="address" value="{{ oc.address or '' }}"></label>
+
+    <div class="form-sep">Банковские реквизиты</div>
+    <label class="wide">Банк<input name="bank_name" value="{{ oc.bank_name or '' }}"></label>
+    <label>БИК<input name="bank_bik" value="{{ oc.bank_bik or '' }}" inputmode="numeric"></label>
+    <label>Расчётный счёт<input name="bank_account" value="{{ oc.bank_account or '' }}" inputmode="numeric"></label>
+    <label>Корр. счёт<input name="corr_account" value="{{ oc.corr_account or '' }}" inputmode="numeric"></label>
+
+    <div class="form-sep">Подписант и контакты</div>
+    <label>ФИО руководителя<input name="director" value="{{ oc.director or '' }}"></label>
+    <label>Телефон<input name="phone" value="{{ oc.phone or '' }}"></label>
+    <label>E-mail<input name="email" value="{{ oc.email or '' }}"></label>
+
+    <div class="form-foot">
+      <button class="btn-sm" type="submit">Сохранить</button>
+      <a class="btn-ghost" href="{{ url_for('companies') }}">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

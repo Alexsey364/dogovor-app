@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block crumb %}<a href="{{ url_for('counterparties') }}">Контрагенты</a> · {{ 'Новый заказчик' if not cp else 'Реквизиты' }}{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h"><h2>{{ 'Новый заказчик' if not cp else cp.name }}</h2></div>
+  <form method="post" class="form">
+    <label class="wide">Полное наименование<input name="name" required value="{{ cp.name if cp else '' }}" placeholder="ООО «Ромашка» / ИП Иванов Иван Иванович"></label>
+    <label>Краткое название<input name="short_name" value="{{ cp.short_name if cp and cp.short_name else '' }}" placeholder="Ромашка"></label>
+    <label>Вид
+      <select name="kind">
+        {% for code, label in KIND_RU.items() %}<option value="{{ code }}"{{ ' selected' if cp and cp.kind==code }}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>ИНН<input name="inn" value="{{ cp.inn if cp and cp.inn else '' }}" inputmode="numeric"></label>
+    <label>КПП<input name="kpp" value="{{ cp.kpp if cp and cp.kpp else '' }}" inputmode="numeric"></label>
+    <label>ОГРН / ОГРНИП<input name="ogrn" value="{{ cp.ogrn if cp and cp.ogrn else '' }}" inputmode="numeric"></label>
+    <label class="wide">Юридический адрес<input name="address" value="{{ cp.address if cp and cp.address else '' }}"></label>
+
+    <div class="form-sep">Банковские реквизиты</div>
+    <label class="wide">Банк<input name="bank_name" value="{{ cp.bank_name if cp and cp.bank_name else '' }}" placeholder="Дальневосточный банк ПАО Сбербанк"></label>
+    <label>БИК<input name="bank_bik" value="{{ cp.bank_bik if cp and cp.bank_bik else '' }}" inputmode="numeric"></label>
+    <label>Расчётный счёт<input name="bank_account" value="{{ cp.bank_account if cp and cp.bank_account else '' }}" inputmode="numeric"></label>
+    <label>Корр. счёт<input name="corr_account" value="{{ cp.corr_account if cp and cp.corr_account else '' }}" inputmode="numeric"></label>
+
+    <div class="form-sep">Подписант и контакты</div>
+    <label>Кто подписывает<input name="signatory" value="{{ cp.signatory if cp and cp.signatory else '' }}" placeholder="Генеральный директор"></label>
+    <label>ФИО подписанта<input name="director" value="{{ cp.director if cp and cp.director else '' }}" placeholder="Иванов Иван Иванович"></label>
+    <label>Телефон<input name="phone" value="{{ cp.phone if cp and cp.phone else '' }}"></label>
+    <label>E-mail<input name="email" value="{{ cp.email if cp and cp.email else '' }}"></label>
+    <label class="wide">Заметки<input name="notes" value="{{ cp.notes if cp and cp.notes else '' }}"></label>
+
+    <div class="form-foot">
+      <button class="btn-sm" type="submit">{{ 'Создать' if not cp else 'Сохранить' }}</button>
+      <a class="btn-ghost" href="{{ url_for('counterparty', pid=cp.id) if cp else url_for('counterparties') }}">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
