@@ -38,6 +38,7 @@
     {% endif %}
     {% if can('edit_contract') %}<a class="btn-ghost" href="{{ url_for('contract_edit', cid=c.id) }}">Редактировать</a>{% endif %}
     {% if can('view_journal') %}<a class="btn-ghost" href="{{ url_for('contract_history', cid=c.id) }}">История</a>{% endif %}
+    <button class="btn-ghost btn-print" type="button" onclick="window.print()">Печать / PDF</button>
   </div>
   {% endif %}
 </div>

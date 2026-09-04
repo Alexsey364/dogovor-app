@@ -785,3 +785,22 @@ a.kpi:hover{box-shadow:0 2px 6px rgba(22,34,46,.08),0 10px 26px rgba(22,34,46,.1
   background:rgba(255,255,255,.65);color:var(--ink-2)}
 :root:not([data-theme=light]) .ev-own,[data-theme=dark] .ev-own{background:rgba(0,0,0,.35);color:var(--ink)}
 .ev-own.own-ip{color:var(--violet)} .ev-own.own-ooo{color:var(--info)}
+
+/* ============================================================
+   ПЕЧАТЬ / PDF (печать браузера → PDF)
+   ============================================================ */
+.btn-print{cursor:pointer}
+@media print{
+  .side, .top, .tabs, .doc-actions, .find-act, .upload-row, .pay-tools,
+  .task-form, .cmt-form, .route-add, .exec-form, .filters, .filter-panel,
+  .btn, .btn-sm, .btn-ghost, .mini, .no-print{display:none !important}
+  .app{display:block}
+  .body{padding:0}
+  .card{box-shadow:none;border:1px solid #ccc;break-inside:avoid;animation:none}
+  .tabpanel[hidden]{display:flex !important}      /* печатаем все вкладки */
+  .tabpanel{gap:14px}
+  body{background:#fff;color:#000;font-size:12px}
+  a{color:#000;text-decoration:none}
+  tbody tr:hover{background:none}
+  @page{margin:14mm}
+}

@@ -5,6 +5,7 @@
   <div class="card-h">
     <h2>{{ rows|length }} договоров{% if total_amount %} · <span class="mono muted">{{ total_amount|money }}</span>{% endif %}</h2>
     {% if can('reports') %}<a class="btn-ghost" href="{{ url_for('export_registry') }}">Excel</a>{% endif %}
+    <button class="btn-ghost btn-print" type="button" onclick="window.print()">Печать / PDF</button>
     {% if can('create_contract') %}<a class="btn-sm" href="{{ url_for('contract_new') }}">+ Договор</a>{% endif %}
     <div class="filters">
       {% set fl = [('all','Все'),('active','В работе'),('findings','С замечаниями'),('warranty','На гарантии'),('cancelled','Аннулированные')] %}
