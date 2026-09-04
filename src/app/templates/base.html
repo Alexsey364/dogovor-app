@@ -20,6 +20,8 @@
         {{ ictile('board') }}<span class="lbl">Доска стадий</span><b>{{ nav.active if nav }}</b></a>
       <a href="{{ url_for('deadlines') }}" class="{{ 'on' if request.endpoint=='deadlines' }}">
         {{ ictile('clock') }}<span class="lbl">Сроки</span>{% if nav and nav.deadlines %}<b class="hot">{{ nav.deadlines }}</b>{% endif %}</a>
+      <a href="{{ url_for('calendar') }}" class="{{ 'on' if request.endpoint=='calendar' }}">
+        {{ ictile('calendar') }}<span class="lbl">Календарь</span></a>
       {% if can('tasks') %}
       <a href="{{ url_for('tasks_page') }}" class="{{ 'on' if request.endpoint=='tasks_page' }}">
         {{ ictile('task') }}<span class="lbl">Задачи</span>{% if nav and nav.my_tasks %}<b class="{{ 'hot' if nav.my_tasks_over else '' }}">{{ nav.my_tasks }}</b>{% endif %}</a>

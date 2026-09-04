@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block crumb %}Календарь{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="card-h">
+    <h2>{{ month_title }}</h2>
+    <div class="row-gap">
+      <a class="btn-ghost" href="{{ url_for('calendar', m=prev_m) }}">← пред.</a>
+      <a class="btn-ghost" href="{{ url_for('calendar') }}">сегодня</a>
+      <a class="btn-ghost" href="{{ url_for('calendar', m=next_m) }}">след. →</a>
+    </div>
+  </div>
+  <div class="cal-legend">
+    <span><i class="dot ev-pay"></i>платёж</span>
+    <span><i class="dot ev-stage"></i>этап</span>
+    <span><i class="dot ev-warr"></i>гарантия</span>
+    <span><i class="dot ev-task"></i>задача</span>
+  </div>
+  <div class="cal">
+    <div class="cal-head">
+      {% for d in ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'] %}<div>{{ d }}</div>{% endfor %}
+    </div>
+    {% for week in weeks %}
+    <div class="cal-week">
+      {% for day in week %}
+      {% set evs = events.get(day.isoformat(), []) %}
+      <div class="cal-day{{ ' cal-out' if day.month != month_num }}{{ ' cal-today' if day == today }}{{ ' cal-weekend' if day.weekday() >= 5 }}">
+        <div class="cal-n">{{ day.day }}</div>
+        {% for e in evs[:4] %}
+        <a class="cal-ev {{ e.cls }}" href="{{ url_for('contract', cid=e.cid) }}" title="{{ e.label }}">{{ e.label }}</a>
+        {% endfor %}
+        {% if evs|length > 4 %}<div class="cal-more">+ ещё {{ evs|length - 4 }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

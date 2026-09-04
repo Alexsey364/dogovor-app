@@ -85,6 +85,7 @@ _ICONS = {
     "alert": '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>',
     "ruble": '<circle cx="12" cy="12" r="9"/><path d="M9 8h4a2.5 2.5 0 010 5H9v-5m0 5v4m-1 0h5m-6-2h4"/>',
     "flag": '<path d="M5 21V4h11l-2 4 2 4H5"/>',
+    "calendar": '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
     "wallet": '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12h3"/>',
 }
 
@@ -1790,6 +1791,82 @@ def deadlines():
         """, tparams)
     return render_template("deadlines.html", pays=pays, warr=warr,
                            ending=ending, stg=stg, tasks=tasks, show_pay=show_pay)
+
+
+@app.route("/calendar")
+@login_required
+def calendar():
+    import datetime as _dt
+    m = request.args.get("m") or _dt.date.today().strftime("%Y-%m")
+    try:
+        year, mon = int(m[:4]), int(m[5:7])
+        first = _dt.date(year, mon, 1)
+    except (ValueError, IndexError):
+        first = _dt.date.today().replace(day=1)
+        year, mon = first.year, first.month
+    nxt = _dt.date(year + (mon == 12), (mon % 12) + 1, 1)
+    last = nxt - _dt.timedelta(days=1)
+    prev = (first - _dt.timedelta(days=1)).replace(day=1)
+
+    events = {}  # 'YYYY-MM-DD' -> [ {type, label, cid, cls} ]
+
+    def add(day, kind, label, cid, cls):
+        if not day:
+            return
+        key = day.isoformat()
+        events.setdefault(key, []).append(
+            {"type": kind, "label": label, "cid": cid, "cls": cls})
+
+    show_pay = perm_level("payments") != "none"
+    if show_pay:
+        for r in db.query("""
+            SELECT p.planned_on, p.amount, c.id AS cid, c.number_text
+            FROM payments p JOIN contracts c ON c.id=p.contract_id
+            WHERE p.paid_on IS NULL AND p.planned_on BETWEEN %s AND %s
+              AND c.stage NOT IN ('archived','cancelled')
+        """, (first, last)):
+            add(r["planned_on"], "pay", f"₽ {r['number_text']}", r["cid"], "ev-pay")
+    for r in db.query("""
+        SELECT s.planned_on, s.name, c.id AS cid, c.number_text
+        FROM stages s JOIN contracts c ON c.id=s.contract_id
+        WHERE s.is_done=false AND s.planned_on BETWEEN %s AND %s
+          AND c.stage NOT IN ('archived','cancelled')
+    """, (first, last)):
+        add(r["planned_on"], "stage", f"этап {r['number_text']}", r["cid"], "ev-stage")
+    for r in db.query("""
+        SELECT c.warranty_until, c.id AS cid, c.number_text
+        FROM contracts c WHERE c.warranty_until BETWEEN %s AND %s
+    """, (first, last)):
+        add(r["warranty_until"], "warr", f"гарантия {r['number_text']}", r["cid"], "ev-warr")
+    if can("tasks"):
+        mine = "AND t.assignee_id=%s" if perm_level("tasks") == "own" else ""
+        pr = (first, last, g.user["id"]) if mine else (first, last)
+        for r in db.query(f"""
+            SELECT t.due_on, t.title, c.id AS cid
+            FROM tasks t LEFT JOIN contracts c ON c.id=t.contract_id
+            WHERE t.is_done=false AND t.due_on BETWEEN %s AND %s {mine}
+        """, pr):
+            add(r["due_on"], "task", "задача: " + (r["title"] or "")[:24],
+                r["cid"], "ev-task")
+
+    # сетка недель (пн-вс), включая хвосты соседних месяцев
+    start = first - _dt.timedelta(days=first.weekday())
+    weeks = []
+    day = start
+    for _ in range(6):
+        week = []
+        for _ in range(7):
+            week.append(day)
+            day += _dt.timedelta(days=1)
+        weeks.append(week)
+        if day > last and day.weekday() == 0:
+            break
+    months_nom = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+    return render_template("calendar.html", weeks=weeks, events=events,
+                           cur=first, month_num=mon, month_title=f"{months_nom[mon]} {year}",
+                           prev_m=prev.strftime("%Y-%m"), next_m=nxt.strftime("%Y-%m"),
+                           today=_dt.date.today())
 
 
 def make_xlsx(sheet, headers, rows):

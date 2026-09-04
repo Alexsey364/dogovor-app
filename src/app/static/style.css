@@ -566,7 +566,7 @@ tr.task-done td:nth-child(2){text-decoration:line-through}
 .nav a.on b.hot{background:var(--crit);color:#fff}
 /* цвета плиток по разделам */
 .t-home,.t-plus,.t-user,.t-doc{background:var(--accent-soft);color:var(--accent)}
-.t-board,.t-list,.t-key{background:var(--info-soft);color:var(--info)}
+.t-board,.t-list,.t-key,.t-calendar{background:var(--info-soft);color:var(--info)}
 .t-clock,.t-pay{background:var(--warn-soft);color:var(--warn)}
 .t-task,.t-users,.t-award{background:var(--violet-soft);color:var(--violet)}
 .t-shield,.t-chart,.t-rules{background:var(--ok-soft);color:var(--ok)}
@@ -748,3 +748,28 @@ a.kpi:hover{box-shadow:0 2px 6px rgba(22,34,46,.08),0 10px 26px rgba(22,34,46,.1
 .tk.owner-ooo{background:color-mix(in srgb,var(--info) 7%,var(--surface))}
 .tk.owner-ip:hover{background:color-mix(in srgb,var(--violet) 12%,var(--surface))}
 .tk.owner-ooo:hover{background:color-mix(in srgb,var(--info) 12%,var(--surface))}
+
+/* ---- календарь сроков ---- */
+.cal-legend{display:flex;gap:16px;flex-wrap:wrap;padding:11px 18px;font-size:12.5px;
+  color:var(--muted);border-bottom:1px solid var(--line-soft)}
+.cal-legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.cal{padding:12px}
+.cal-head{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:5px}
+.cal-head div{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);text-align:center}
+.cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:5px}
+.cal-day{min-height:94px;border:1px solid var(--line-soft);border-radius:9px;padding:5px 6px;
+  background:var(--surface);display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.cal-day.cal-out{background:var(--surface-2);opacity:.55}
+.cal-day.cal-weekend{background:color-mix(in srgb,var(--warn) 4%,var(--surface))}
+.cal-day.cal-today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.cal-n{font-size:12px;font-weight:700;color:var(--ink-2);align-self:flex-end;line-height:1}
+.cal-ev{font-size:10.5px;line-height:1.3;padding:2px 6px;border-radius:5px;text-decoration:none;
+  color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;border-left:3px solid var(--muted)}
+.cal-ev.ev-pay{background:var(--warn-soft);border-left-color:var(--warn)}
+.cal-ev.ev-stage{background:var(--accent-soft);border-left-color:var(--accent)}
+.cal-ev.ev-warr{background:var(--ok-soft);border-left-color:var(--ok)}
+.cal-ev.ev-task{background:var(--violet-soft);border-left-color:var(--violet)}
+.cal-legend .dot.ev-pay{background:var(--warn)} .cal-legend .dot.ev-stage{background:var(--accent)}
+.cal-legend .dot.ev-warr{background:var(--ok)} .cal-legend .dot.ev-task{background:var(--violet)}
+.cal-more{font-size:10px;color:var(--muted)}
+@media (max-width:700px){.cal-day{min-height:62px}.cal-ev{font-size:9px;padding:1px 4px}}
