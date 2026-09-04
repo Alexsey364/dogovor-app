@@ -3,6 +3,7 @@
 {% block crumb %}<a href="{{ url_for('registry') }}">Реестр</a> · {{ c.number_text }}{% endblock %}
 {% block body %}
 
+{# ---- шапка договора (всегда видна) ---- #}
 <div class="card">
   <div class="doc-h">
     <div>
@@ -41,6 +42,20 @@
   {% endif %}
 </div>
 
+{# ---- вкладки ---- #}
+{% set open_tasks = tasks|selectattr('is_done','equalto',false)|list|length %}
+<div class="tabs" id="tabs">
+  <button class="tab" data-tab="overview">Обзор</button>
+  <button class="tab" data-tab="files">Файлы{% if files %} <b>{{ files|length }}</b>{% endif %}</button>
+  <button class="tab" data-tab="exec">Исполнение</button>
+  <button class="tab" data-tab="approval">Согласование{% if approvals %} <b>{{ approvals|selectattr('status','equalto','pending')|list|length }}</b>{% endif %}</button>
+  <button class="tab" data-tab="links">Связи{% if links %} <b>{{ links|length }}</b>{% endif %}</button>
+  <button class="tab" data-tab="tasks">Задачи{% if open_tasks %} <b>{{ open_tasks }}</b>{% endif %}</button>
+  <button class="tab" data-tab="discuss">Обсуждение{% if comments %} <b>{{ comments|length }}</b>{% endif %}</button>
+</div>
+
+{# ============ ОБЗОР ============ #}
+<div class="tabpanel" data-tab="overview">
 <div class="card">
   <div class="card-h"><h2>Проверка договора</h2>
     <div class="row-gap">
@@ -90,6 +105,36 @@
   {% endif %}
 </div>
 
+<div class="grid2">
+  <div class="card">
+    <div class="card-h"><h2>Исполнение</h2></div>
+    <div class="kv"><b>Стадия</b><span>{{ STAGE_RU[c.stage] }}</span></div>
+    <div class="kv"><b>Дата окончания работ</b><span class="mono">{{ c.completed_on|dt if c.completed_on else '—' }}</span></div>
+    <div class="kv"><b>Дата ввода в эксплуатацию</b><span class="mono">{{ c.commissioning_date|dt if c.commissioning_date else '—' }}</span></div>
+    <div class="kv"><b>Гарантия действует до</b><span class="mono">{{ c.warranty_until|dt if c.warranty_until else 'нужна дата ввода' }}</span></div>
+    {% if can('execution') %}
+    <form method="post" action="{{ url_for('contract_execution', cid=c.id) }}" class="exec-form">
+      <label>Окончание работ<input type="date" name="completed_on" value="{{ c.completed_on|dt('%Y-%m-%d') if c.completed_on else '' }}"></label>
+      <label>Ввод в эксплуатацию<input type="date" name="commissioning_date" value="{{ c.commissioning_date|dt('%Y-%m-%d') if c.commissioning_date else '' }}"></label>
+      <button class="btn-sm" type="submit">Сохранить даты</button>
+    </form>
+    <div class="legend">Заполните дату ввода — конец гарантии посчитается сам ({{ c.warranty_months or '—' }} мес.). Даты берутся из актов.</div>
+    {% else %}
+    <div class="legend">Даты ввода и окончания заполняет ответственный по актам.</div>
+    {% endif %}
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>Реквизиты</h2></div>
+    <div class="kv"><b>Внешний номер</b><span class="mono">{{ c.external_number or '—' }}</span></div>
+    <div class="kv"><b>ИКЗ</b><span class="mono">{{ c.ikz or '—' }}</span></div>
+    <div class="kv"><b>Создан</b><span class="mono muted">{{ c.created_at|dt('%d.%m.%y %H:%M') if c.created_at else '—' }}</span></div>
+    <div class="kv"><b>Изменён</b><span class="mono muted">{{ c.updated_at|dt('%d.%m.%y %H:%M') if c.updated_at else '—' }}</span></div>
+  </div>
+</div>
+</div>
+
+{# ============ ФАЙЛЫ ============ #}
+<div class="tabpanel" data-tab="files">
 <div class="card">
   <div class="card-h"><h2>Документы {% if files %}<span class="badge">{{ files|length }}</span>{% endif %}</h2>
     {% if can('view_contracts') %}<a class="link" href="{{ url_for('contract_history', cid=c.id) }}">журнал изменений →</a>{% endif %}
@@ -129,7 +174,10 @@
   <div class="legend">Файлы хранятся на сервере, ночью копируются на NAS. Загрузка и скачивание
     пишутся в журнал изменений — он не стирается и виден всем.</div>
 </div>
+</div>
 
+{# ============ ИСПОЛНЕНИЕ (платежи + этапы) ============ #}
+<div class="tabpanel" data-tab="exec">
 {% if can('payments') or perm_level('payments') != 'none' %}
 <div class="card">
   <div class="card-h"><h2>Платежи</h2>
@@ -238,37 +286,23 @@
   </details>
   {% endif %}
 </div>
-
-<div class="grid2">
-  <div class="card">
-    <div class="card-h"><h2>Исполнение</h2></div>
-    <div class="kv"><b>Стадия</b><span>{{ STAGE_RU[c.stage] }}</span></div>
-    <div class="kv"><b>Дата окончания работ</b><span class="mono">{{ c.completed_on|dt if c.completed_on else '—' }}</span></div>
-    <div class="kv"><b>Дата ввода в эксплуатацию</b><span class="mono">{{ c.commissioning_date|dt if c.commissioning_date else '—' }}</span></div>
-    <div class="kv"><b>Гарантия действует до</b><span class="mono">{{ c.warranty_until|dt if c.warranty_until else 'нужна дата ввода' }}</span></div>
-    {% if can('execution') %}
-    <form method="post" action="{{ url_for('contract_execution', cid=c.id) }}" class="exec-form">
-      <label>Окончание работ<input type="date" name="completed_on" value="{{ c.completed_on|dt('%Y-%m-%d') if c.completed_on else '' }}"></label>
-      <label>Ввод в эксплуатацию<input type="date" name="commissioning_date" value="{{ c.commissioning_date|dt('%Y-%m-%d') if c.commissioning_date else '' }}"></label>
-      <button class="btn-sm" type="submit">Сохранить даты</button>
-    </form>
-    <div class="legend">Заполните дату ввода — конец гарантии посчитается сам ({{ c.warranty_months or '—' }} мес.). Даты берутся из актов.</div>
-    {% else %}
-    <div class="legend">Даты ввода и окончания заполняет ответственный по актам.</div>
-    {% endif %}
-  </div>
-  <div class="card">
-    <div class="card-h"><h2>Реквизиты</h2></div>
-    <div class="kv"><b>Внешний номер</b><span class="mono">{{ c.external_number or '—' }}</span></div>
-    <div class="kv"><b>ИКЗ</b><span class="mono">{{ c.ikz or '—' }}</span></div>
-    <div class="kv"><b>Создан</b><span class="mono muted">{{ c.created_at|dt('%d.%m.%y %H:%M') if c.created_at else '—' }}</span></div>
-    <div class="kv"><b>Изменён</b><span class="mono muted">{{ c.updated_at|dt('%d.%m.%y %H:%M') if c.updated_at else '—' }}</span></div>
-  </div>
 </div>
 
-<div class="card" id="tasks">
+{# ============ СОГЛАСОВАНИЕ ============ #}
+<div class="tabpanel" data-tab="approval">
+  {% include "_approval.html" %}
+</div>
+
+{# ============ СВЯЗИ ============ #}
+<div class="tabpanel" data-tab="links">
+  {% include "_links.html" %}
+</div>
+
+{# ============ ЗАДАЧИ ============ #}
+<div class="tabpanel" data-tab="tasks" id="tasks">
+<div class="card">
   <div class="card-h"><h2>Задачи и поручения</h2>
-    <span class="badge">{{ tasks|selectattr('is_done','equalto',false)|list|length }} открыто</span></div>
+    <span class="badge">{{ open_tasks }} открыто</span></div>
   {% if tasks %}
   <div class="tasklist">
     {% for t in tasks %}
@@ -323,8 +357,11 @@
   </form>
   {% endif %}
 </div>
+</div>
 
-<div class="card" id="discuss">
+{# ============ ОБСУЖДЕНИЕ ============ #}
+<div class="tabpanel" data-tab="discuss" id="discuss">
+<div class="card">
   <div class="card-h"><h2>Обсуждение</h2><span class="badge">{{ comments|length }}</span></div>
   {% if comments %}
   <div class="comments">
@@ -346,12 +383,27 @@
     </div>
   </form>
 </div>
+</div>
+
 <script>
-  (function(){
-    var t = document.querySelector('.cmt-form textarea');
-    if(t) t.addEventListener('keydown', function(e){
-      if((e.ctrlKey||e.metaKey) && e.key === 'Enter') this.form.submit();
-    });
-  })();
+(function(){
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('#tabs .tab'));
+  var panels = Array.prototype.slice.call(document.querySelectorAll('.tabpanel'));
+  function show(name){
+    var found = false;
+    panels.forEach(function(p){ var on = p.dataset.tab === name; p.hidden = !on; if(on) found = true; });
+    if(!found){ name = 'overview'; panels.forEach(function(p){ p.hidden = p.dataset.tab !== 'overview'; }); }
+    tabs.forEach(function(t){ t.classList.toggle('on', t.dataset.tab === name); });
+    try { history.replaceState(null, '', '#' + name); } catch(e){}
+  }
+  tabs.forEach(function(t){ t.addEventListener('click', function(){ show(t.dataset.tab); }); });
+  var h = (location.hash || '').replace('#','');
+  show(h || 'overview');
+
+  var ta = document.querySelector('.cmt-form textarea');
+  if(ta) ta.addEventListener('keydown', function(e){
+    if((e.ctrlKey||e.metaKey) && e.key === 'Enter') this.form.submit();
+  });
+})();
 </script>
 {% endblock %}

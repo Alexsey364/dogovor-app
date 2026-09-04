@@ -1,0 +1,35 @@
+<div class="card">
+  <div class="card-h"><h2>Связанные документы</h2>{% if links %}<span class="badge">{{ links|length }}</span>{% endif %}</div>
+  {% if links %}
+  <div class="tablewrap"><table>
+    <thead><tr><th>Тип связи</th><th>Договор</th><th>Заказчик</th><th>Стадия</th><th>Комментарий</th><th></th></tr></thead>
+    <tbody>
+      {% for l in links %}
+      <tr>
+        <td><span class="pill">{{ LINK_RU.get(l.link_type, l.link_type) }}</span></td>
+        <td class="mono"><a class="who-link" href="{{ url_for('contract', cid=l.other_id) }}">{{ l.number_text }}</a></td>
+        <td>{{ l.counterparty or '—' }}</td>
+        <td><span class="pill stage-{{ l.stage }}">{{ STAGE_RU[l.stage] }}</span></td>
+        <td class="muted">{{ l.comment or '—' }}</td>
+        <td>{% if can('edit_contract') %}<form method="post" action="{{ url_for('link_delete', lid=l.id) }}" class="inline" onsubmit="return confirm('Убрать связь?')"><button class="task-del" type="submit">×</button></form>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+    <div class="empty muted">Связей нет. Свяжите допсоглашение, приложение/смету или перевыпущенный договор (М 27 → М 49).</div>
+  {% endif %}
+  {% if can('edit_contract') %}
+  <form method="post" action="{{ url_for('link_add', cid=c.id) }}" class="route-add">
+    <select name="other_id" required style="min-width:220px">
+      <option value="">— выберите договор —</option>
+      {% for t in link_targets %}<option value="{{ t.id }}">{{ t.number_text }} · {{ t.counterparty or '—' }}</option>{% endfor %}
+    </select>
+    <select name="link_type">
+      {% for code, label in LINK_RU.items() %}<option value="{{ code }}">{{ label }}</option>{% endfor %}
+    </select>
+    <input name="comment" placeholder="комментарий (необязательно)" style="flex:1;min-width:160px">
+    <button class="btn-sm" type="submit">Связать</button>
+  </form>
+  {% endif %}
+</div>

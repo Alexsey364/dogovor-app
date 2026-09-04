@@ -99,8 +99,18 @@ def ictile(name):
                   f'aria-hidden="true">{_ICONS.get(name, "")}</svg></span>')
 
 
+def asset_ver():
+    """Версия статики по времени изменения style.css — чтобы браузер
+    подхватывал новый CSS сам, без Ctrl+F5."""
+    try:
+        return int(os.path.getmtime(os.path.join(app.static_folder, "style.css")))
+    except Exception:  # noqa: BLE001
+        return 1
+
+
 app.jinja_env.globals.update(FILE_KIND_RU=FILE_KIND_RU, FILE_KINDS=FILE_KINDS,
-                             human_size=human_size, ic=ic, ictile=ictile)
+                             human_size=human_size, ic=ic, ictile=ictile,
+                             asset_ver=asset_ver)
 app.jinja_env.globals.update(STAGE_RU=STAGE_RU, SEV_RU=SEV_RU, KIND_RU=KIND_RU,
                              STAGE_ORDER=["draft", "internal_review", "legal_review",
                                           "at_counterparty", "in_progress", "completed",
@@ -485,9 +495,31 @@ def contract(cid: int):
         ORDER BY t.is_done, t.due_on NULLS LAST, t.id
     """, (cid,))
     team = db.query("SELECT id, full_name FROM users WHERE is_active ORDER BY full_name")
+    links = db.query("""
+        SELECT l.id, l.link_type, l.comment, l.parent_id,
+               (CASE WHEN l.parent_id=%s THEN l.child_id ELSE l.parent_id END) AS other_id,
+               c2.number_text, c2.stage, cp.name AS counterparty
+        FROM contract_links l
+        JOIN contracts c2 ON c2.id = (CASE WHEN l.parent_id=%s THEN l.child_id ELSE l.parent_id END)
+        LEFT JOIN counterparties cp ON cp.id=c2.counterparty_id
+        WHERE l.parent_id=%s OR l.child_id=%s
+        ORDER BY l.created_at DESC
+    """, (cid, cid, cid, cid))
+    link_targets = db.query("""
+        SELECT c.id, c.number_text, cp.name AS counterparty
+        FROM contracts c LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        WHERE c.id<>%s ORDER BY c.number_text DESC LIMIT 400
+    """, (cid,))
+    approvals = db.query("""
+        SELECT a.id, a.ord, a.status, a.comment, a.decided_at, a.approver_id,
+               u.full_name AS approver
+        FROM approvals a LEFT JOIN users u ON u.id=a.approver_id
+        WHERE a.contract_id=%s ORDER BY a.ord, a.id
+    """, (cid,))
     return render_template("contract.html", c=c, findings=findings, files=files,
                            payments=payments, pay_sum=pay_sum, comments=comments,
-                           tasks=tasks, team=team)
+                           tasks=tasks, team=team, links=links, link_targets=link_targets,
+                           approvals=approvals)
 
 
 @app.route("/contract/<int:cid>/comment", methods=["POST"])
@@ -1365,6 +1397,125 @@ def contract_history(cid):
     """, (cid,))
     c = db.query_one("SELECT number_text FROM contracts WHERE id=%s", (cid,))
     return render_template("history.html", rows=rows, c=c, cid=cid)
+
+
+# ------------------------------------------------------------------
+#  Связи между договорами
+# ------------------------------------------------------------------
+
+LINK_RU = {"reissue": "перевыпуск", "supplement": "допсоглашение",
+           "annex": "приложение/смета", "same_object": "тот же объект"}
+app.jinja_env.globals.update(LINK_RU=LINK_RU)
+
+
+@app.route("/contract/<int:cid>/link", methods=["POST"])
+@login_required
+def link_add(cid):
+    if not can("edit_contract"):
+        abort(403)
+    other = request.form.get("other_id")
+    ltype = request.form.get("link_type")
+    comment = (request.form.get("comment") or "").strip() or None
+    if not (other and other.isdigit()) or ltype not in LINK_RU:
+        flash("Выберите договор и тип связи")
+        return redirect(url_for("contract", cid=cid) + "#links")
+    other = int(other)
+    if other == cid:
+        flash("Нельзя связать договор с самим собой")
+        return redirect(url_for("contract", cid=cid) + "#links")
+    if not db.query_one("SELECT 1 FROM contracts WHERE id=%s", (other,)):
+        abort(404)
+    exists = db.query_one(
+        "SELECT 1 FROM contract_links WHERE link_type=%s AND "
+        "((parent_id=%s AND child_id=%s) OR (parent_id=%s AND child_id=%s))",
+        (ltype, cid, other, other, cid))
+    if not exists:
+        db.execute("INSERT INTO contract_links(parent_id, child_id, link_type, comment) "
+                   "VALUES(%s,%s,%s,%s)", (cid, other, ltype, comment))
+        audit("link_add", "contract", cid, after={"other": other, "type": ltype})
+    return redirect(url_for("contract", cid=cid) + "#links")
+
+
+@app.route("/link/<int:lid>/delete", methods=["POST"])
+@login_required
+def link_delete(lid):
+    if not can("edit_contract"):
+        abort(403)
+    row = db.query_one("SELECT parent_id FROM contract_links WHERE id=%s", (lid,))
+    if not row:
+        abort(404)
+    db.execute("DELETE FROM contract_links WHERE id=%s", (lid,))
+    audit("link_delete", "contract", row["parent_id"], after={"link_id": lid})
+    return redirect(url_for("contract", cid=row["parent_id"]) + "#links")
+
+
+# ------------------------------------------------------------------
+#  Маршрут согласования (визирование)
+# ------------------------------------------------------------------
+
+def _can_manage_route():
+    return can("approve_send") or can("edit_contract")
+
+
+@app.route("/contract/<int:cid>/approval", methods=["POST"])
+@login_required
+def approval_add(cid):
+    if not _can_manage_route():
+        abort(403)
+    if not db.query_one("SELECT 1 FROM contracts WHERE id=%s", (cid,)):
+        abort(404)
+    approver = request.form.get("approver_id")
+    if not (approver and approver.isdigit()):
+        flash("Выберите визирующего")
+        return redirect(url_for("contract", cid=cid) + "#approval")
+    nxt = db.query_one("SELECT coalesce(max(ord),0)+1 AS n FROM approvals WHERE contract_id=%s", (cid,))
+    db.execute("INSERT INTO approvals(contract_id, ord, approver_id, created_by) "
+               "VALUES(%s,%s,%s,%s)", (cid, nxt["n"], int(approver), g.user["id"]))
+    audit("approval_add", "contract", cid, after={"approver_id": int(approver), "ord": nxt["n"]})
+    return redirect(url_for("contract", cid=cid) + "#approval")
+
+
+@app.route("/approval/<int:aid>/decide", methods=["POST"])
+@login_required
+def approval_decide(aid):
+    a = db.query_one("SELECT id, contract_id, ord, approver_id, status FROM approvals WHERE id=%s", (aid,))
+    if not a:
+        abort(404)
+    # решать может назначенный визирующий или у кого право «согласовать и отправить»
+    if not (a["approver_id"] == g.user["id"] or can("approve_send")):
+        abort(403)
+    if a["status"] != "pending":
+        flash("Этот шаг уже пройден")
+        return redirect(url_for("contract", cid=a["contract_id"]) + "#approval")
+    # только текущий (первый непройденный) шаг активен
+    cur = db.query_one("SELECT id FROM approvals WHERE contract_id=%s AND status='pending' "
+                       "ORDER BY ord, id LIMIT 1", (a["contract_id"],))
+    if cur and cur["id"] != aid:
+        flash("Сначала должен решить предыдущий согласующий")
+        return redirect(url_for("contract", cid=a["contract_id"]) + "#approval")
+    decision = request.form.get("decision")
+    if decision not in ("approved", "rejected"):
+        abort(400)
+    comment = (request.form.get("comment") or "").strip() or None
+    db.execute("UPDATE approvals SET status=%s, comment=%s, decided_at=now() WHERE id=%s",
+               (decision, comment, aid))
+    audit("approval_" + decision, "contract", a["contract_id"],
+          after={"approval_id": aid, "comment": comment})
+    flash("Согласовано" if decision == "approved" else "Отклонено с замечаниями")
+    return redirect(url_for("contract", cid=a["contract_id"]) + "#approval")
+
+
+@app.route("/approval/<int:aid>/delete", methods=["POST"])
+@login_required
+def approval_delete(aid):
+    if not _can_manage_route():
+        abort(403)
+    a = db.query_one("SELECT id, contract_id FROM approvals WHERE id=%s", (aid,))
+    if not a:
+        abort(404)
+    db.execute("DELETE FROM approvals WHERE id=%s", (aid,))
+    audit("approval_delete", "contract", a["contract_id"], after={"approval_id": aid})
+    return redirect(url_for("contract", cid=a["contract_id"]) + "#approval")
 
 
 # ------------------------------------------------------------------

@@ -666,3 +666,44 @@ a.kpi:hover{box-shadow:0 2px 6px rgba(22,34,46,.08),0 10px 26px rgba(22,34,46,.1
 .find-row .chev{font-size:16px;color:var(--muted)}
 .grid2{gap:22px}
 .hero-hi{font-size:24px}
+
+/* ============================================================
+   ВКЛАДКИ В КАРТОЧКЕ ДОГОВОРА
+   ============================================================ */
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line)}
+.tab{font:inherit;font-size:14px;font-weight:600;color:var(--ink-2);background:none;border:none;
+  padding:10px 15px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;
+  border-radius:8px 8px 0 0;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tab:hover{background:var(--surface-2);color:var(--ink)}
+.tab.on{color:var(--accent-ink);border-bottom-color:var(--accent);font-weight:700}
+.tab b{font-size:11px;background:var(--accent-soft);color:var(--accent-ink);border-radius:20px;
+  padding:1px 7px;min-width:18px;text-align:center}
+.tabpanel{display:flex;flex-direction:column;gap:22px}
+
+/* маршрут согласования */
+.route{display:flex;flex-direction:column}
+.route-step{display:flex;gap:13px;align-items:flex-start;padding:13px 16px;
+  border-bottom:1px solid var(--line-soft);border-left:3px solid var(--line)}
+.route-step:last-child{border-bottom:none}
+.route-step.step-approved{border-left-color:var(--ok)}
+.route-step.step-rejected{border-left-color:var(--crit)}
+.route-step.step-current{border-left-color:var(--warn);background:var(--warn-soft)}
+.rs-ord{width:27px;height:27px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);
+  display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:0 0 auto}
+.route-step.step-approved .rs-ord{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.route-step.step-rejected .rs-ord{background:var(--crit-soft);color:var(--crit);border-color:var(--crit)}
+.route-step.step-current .rs-ord{background:var(--warn);color:#fff;border-color:var(--warn)}
+.rs-main{flex:1;min-width:0}
+.rs-who{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rs-cmt{font-size:13px;color:var(--ink-2);margin-top:4px}
+.rs-when{font-size:12px;margin-top:2px}
+.rs-act{display:flex;align-items:center;gap:6px}
+.rs-decide{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rs-decide input{padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--field);
+  font:inherit;font-size:13px;color:inherit}
+.route-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:13px 16px;border-top:1px solid var(--line-soft)}
+.route-add select,.route-add input{padding:8px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--field);font:inherit;font-size:14px;color:inherit}
+
+/* скрытая вкладка не должна показываться (перебивает display:flex) */
+.tabpanel[hidden]{display:none}

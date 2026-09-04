@@ -1,0 +1,51 @@
+{% set current = (approvals|selectattr('status','equalto','pending')|list|first) %}
+<div class="card">
+  <div class="card-h"><h2>Маршрут согласования</h2>
+    {% if approvals %}
+      {% set appr = approvals|selectattr('status','equalto','approved')|list|length %}
+      <span class="muted" style="font-size:13px">согласовано {{ appr }} из {{ approvals|length }}</span>
+    {% endif %}
+  </div>
+  {% if approvals %}
+  <div class="route">
+    {% for a in approvals %}
+    <div class="route-step step-{{ a.status }}{{ ' step-current' if current and a.id==current.id }}">
+      <div class="rs-ord">{{ a.ord }}</div>
+      <div class="rs-main">
+        <div class="rs-who">{{ a.approver or 'не назначен' }}
+          {% if a.status=='approved' %}<span class="pill ok">согласовано</span>
+          {% elif a.status=='rejected' %}<span class="pill crit">замечания</span>
+          {% elif current and a.id==current.id %}<span class="pill warn">на согласовании</span>
+          {% else %}<span class="pill">ожидает очереди</span>{% endif %}
+        </div>
+        {% if a.comment %}<div class="rs-cmt">«{{ a.comment }}»</div>{% endif %}
+        {% if a.decided_at %}<div class="rs-when muted">{{ a.decided_at|dt('%d.%m.%y %H:%M') }}</div>{% endif %}
+      </div>
+      <div class="rs-act">
+        {% if current and a.id==current.id and (a.approver_id==g.user.id or can('approve_send')) %}
+        <form method="post" action="{{ url_for('approval_decide', aid=a.id) }}" class="rs-decide">
+          <input name="comment" placeholder="замечание (для отклонения)">
+          <button class="mini ok" name="decision" value="approved" type="submit">Согласовать</button>
+          <button class="mini" name="decision" value="rejected" type="submit">Замечания</button>
+        </form>
+        {% endif %}
+        {% if (can('approve_send') or can('edit_contract')) and a.status=='pending' %}
+        <form method="post" action="{{ url_for('approval_delete', aid=a.id) }}" class="inline" onsubmit="return confirm('Убрать шаг маршрута?')"><button class="task-del" type="submit" title="Убрать">×</button></form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="empty muted">Маршрут не задан. Добавьте визирующих — договор пойдёт по цепочке: каждый следующий видит замечания предыдущего.</div>
+  {% endif %}
+  {% if can('approve_send') or can('edit_contract') %}
+  <form method="post" action="{{ url_for('approval_add', cid=c.id) }}" class="route-add">
+    <select name="approver_id" required style="min-width:220px">
+      <option value="">— добавить визирующего —</option>
+      {% for u in team %}<option value="{{ u.id }}">{{ u.full_name }}</option>{% endfor %}
+    </select>
+    <button class="btn-sm" type="submit">+ Шаг</button>
+  </form>
+  {% endif %}
+</div>
