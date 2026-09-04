@@ -27,7 +27,8 @@
       <div class="cal-day{{ ' cal-out' if day.month != month_num }}{{ ' cal-today' if day == today }}{{ ' cal-weekend' if day.weekday() >= 5 }}">
         <div class="cal-n">{{ day.day }}</div>
         {% for e in evs[:4] %}
-        <a class="cal-ev {{ e.cls }}" href="{{ url_for('contract', cid=e.cid) }}" title="{{ e.label }}">{{ e.label }}</a>
+        <a class="cal-ev {{ e.cls }}" href="{{ url_for('contract', cid=e.cid) }}" title="{{ e.label }}">
+          <span class="ev-t">{{ e.label }}</span>{% if e.own %}<b class="ev-own own-{{ e.own }}">{{ 'ИП' if e.own=='ip' else 'ООО' }}</b>{% endif %}</a>
         {% endfor %}
         {% if evs|length > 4 %}<div class="cal-more">+ ещё {{ evs|length - 4 }}</div>{% endif %}
       </div>

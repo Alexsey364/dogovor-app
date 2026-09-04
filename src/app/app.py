@@ -1808,46 +1808,55 @@ def calendar():
     last = nxt - _dt.timedelta(days=1)
     prev = (first - _dt.timedelta(days=1)).replace(day=1)
 
-    events = {}  # 'YYYY-MM-DD' -> [ {type, label, cid, cls} ]
+    events = {}  # 'YYYY-MM-DD' -> [ {type, label, cid, cls, own} ]
 
-    def add(day, kind, label, cid, cls):
+    def _own(name):
+        if not name:
+            return ""
+        return "ip" if "Цыруль" in name else "ooo"
+
+    def add(day, kind, label, cid, cls, owner):
         if not day:
             return
         key = day.isoformat()
         events.setdefault(key, []).append(
-            {"type": kind, "label": label, "cid": cid, "cls": cls})
+            {"type": kind, "label": label, "cid": cid, "cls": cls, "own": _own(owner)})
 
     show_pay = perm_level("payments") != "none"
     if show_pay:
         for r in db.query("""
-            SELECT p.planned_on, p.amount, c.id AS cid, c.number_text
+            SELECT p.planned_on, p.amount, c.id AS cid, c.number_text, oc.short_name AS owner
             FROM payments p JOIN contracts c ON c.id=p.contract_id
+            LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
             WHERE p.paid_on IS NULL AND p.planned_on BETWEEN %s AND %s
               AND c.stage NOT IN ('archived','cancelled')
         """, (first, last)):
-            add(r["planned_on"], "pay", f"₽ {r['number_text']}", r["cid"], "ev-pay")
+            add(r["planned_on"], "pay", f"₽ {r['number_text']}", r["cid"], "ev-pay", r["owner"])
     for r in db.query("""
-        SELECT s.planned_on, s.name, c.id AS cid, c.number_text
+        SELECT s.planned_on, s.name, c.id AS cid, c.number_text, oc.short_name AS owner
         FROM stages s JOIN contracts c ON c.id=s.contract_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         WHERE s.is_done=false AND s.planned_on BETWEEN %s AND %s
           AND c.stage NOT IN ('archived','cancelled')
     """, (first, last)):
-        add(r["planned_on"], "stage", f"этап {r['number_text']}", r["cid"], "ev-stage")
+        add(r["planned_on"], "stage", f"этап {r['number_text']}", r["cid"], "ev-stage", r["owner"])
     for r in db.query("""
-        SELECT c.warranty_until, c.id AS cid, c.number_text
-        FROM contracts c WHERE c.warranty_until BETWEEN %s AND %s
+        SELECT c.warranty_until, c.id AS cid, c.number_text, oc.short_name AS owner
+        FROM contracts c LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
+        WHERE c.warranty_until BETWEEN %s AND %s
     """, (first, last)):
-        add(r["warranty_until"], "warr", f"гарантия {r['number_text']}", r["cid"], "ev-warr")
+        add(r["warranty_until"], "warr", f"гарантия {r['number_text']}", r["cid"], "ev-warr", r["owner"])
     if can("tasks"):
         mine = "AND t.assignee_id=%s" if perm_level("tasks") == "own" else ""
         pr = (first, last, g.user["id"]) if mine else (first, last)
         for r in db.query(f"""
-            SELECT t.due_on, t.title, c.id AS cid
+            SELECT t.due_on, t.title, c.id AS cid, oc.short_name AS owner
             FROM tasks t LEFT JOIN contracts c ON c.id=t.contract_id
+            LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
             WHERE t.is_done=false AND t.due_on BETWEEN %s AND %s {mine}
         """, pr):
-            add(r["due_on"], "task", "задача: " + (r["title"] or "")[:24],
-                r["cid"], "ev-task")
+            add(r["due_on"], "task", "задача: " + (r["title"] or "")[:22],
+                r["cid"], "ev-task", r["owner"])
 
     # сетка недель (пн-вс), включая хвосты соседних месяцев
     start = first - _dt.timedelta(days=first.weekday())
