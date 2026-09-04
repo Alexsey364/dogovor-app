@@ -19,6 +19,18 @@
     <form class="filter-form" method="get" action="{{ url_for('registry') }}">
       <input type="hidden" name="f" value="{{ flt }}">
       <label>Текст<input name="q" value="{{ args.get('q','') }}" placeholder="номер, заказчик, адрес, предмет"></label>
+      <label>Наша компания
+        <select name="owner">
+          <option value="">— обе —</option>
+          {% for oc in companies %}<option value="{{ oc.id }}"{{ ' selected' if args.get('owner')==oc.id|string }}>{{ oc.short_name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Год
+        <select name="year">
+          <option value="">— все —</option>
+          {% for y in years %}<option value="{{ y }}"{{ ' selected' if args.get('year')==y|string }}>{{ y }}</option>{% endfor %}
+        </select>
+      </label>
       <label>Тип работ
         <select name="type">
           <option value="">— любой —</option>
@@ -49,11 +61,12 @@
   </details>
 
   <div class="tablewrap"><table>
-    <thead><tr><th>Номер</th><th>Дата</th><th>Заказчик</th><th>Объект</th><th>Сумма</th><th>Аванс</th><th>Гар.</th><th>Замеч.</th><th>Стадия</th></tr></thead>
+    <thead><tr><th>Номер</th><th>Компания</th><th>Дата</th><th>Заказчик</th><th>Объект</th><th>Сумма</th><th>Аванс</th><th>Гар.</th><th>Замеч.</th><th>Стадия</th></tr></thead>
     <tbody>
       {% for r in rows %}
       <tr onclick="location='{{ url_for('contract', cid=r.id) }}'">
         <td class="mono">{{ r.number_text }}</td>
+        <td>{% if r.owner %}<span class="pill owner-{{ 'ip' if 'Цыруль' in r.owner else 'ooo' }}">{{ r.owner }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td class="mono">{{ r.signed_on|dt('%d.%m.%y') }}</td>
         <td>{{ r.counterparty or '—' }}</td>
         <td class="muted">{{ (r.object or '—')|truncate(30) }}</td>

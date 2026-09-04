@@ -723,3 +723,7 @@ a.kpi:hover{box-shadow:0 2px 6px rgba(22,34,46,.08),0 10px 26px rgba(22,34,46,.1
 .bars.money .bn{text-align:right}
 @media (max-width:600px){.bars.money .bar{grid-template-columns:110px 1fr 96px}.bars.money .bn{font-size:12px}}
 .export-row{display:flex;gap:10px;flex-wrap:wrap;padding:15px 18px 4px}
+
+/* плашки компании-владельца */
+.pill.owner-ip{background:var(--violet-soft);color:var(--violet);border:none}
+.pill.owner-ooo{background:var(--info-soft);color:var(--info);border:none}

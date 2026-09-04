@@ -414,27 +414,42 @@ def registry():
     if a_max.isdigit():
         clauses.append("c.amount <= %s")
         params.append(int(a_max))
+    f_owner = request.args.get("owner") or ""
+    if f_owner.isdigit():
+        clauses.append("c.owner_company_id = %s")
+        params.append(int(f_owner))
+    f_year = request.args.get("year") or ""
+    if f_year.isdigit():
+        clauses.append("extract(year from c.signed_on) = %s")
+        params.append(int(f_year))
 
     where = " AND ".join(clauses) if clauses else "1=1"
     rows = db.query(f"""
         SELECT c.id, c.number_text, c.subject, c.amount, c.advance_pct, c.stage,
                c.signed_on, c.warranty_months, cp.name AS counterparty,
-               ct.name AS type_name, o.address AS object,
+               ct.name AS type_name, o.address AS object, oc.short_name AS owner,
                (SELECT count(*) FROM review_findings rf
                  WHERE rf.contract_id=c.id AND rf.resolution IS NULL) AS findings
         FROM contracts c
         LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
         LEFT JOIN contract_types ct ON ct.code=c.type_code
         LEFT JOIN objects o ON o.id=c.object_id
+        LEFT JOIN owner_companies oc ON oc.id=c.owner_company_id
         WHERE {where}
         ORDER BY c.number_text DESC LIMIT 500
     """, tuple(params))
     total_amount = sum(float(r["amount"]) for r in rows if r["amount"])
     types = db.query("SELECT code, name FROM contract_types ORDER BY name")
     cps = db.query("SELECT id, name FROM counterparties WHERE is_active ORDER BY name")
+    companies = db.query("SELECT id, short_name FROM owner_companies WHERE is_active ORDER BY ord")
+    years = [r["y"] for r in db.query(
+        "SELECT DISTINCT extract(year from signed_on)::int AS y FROM contracts "
+        "WHERE signed_on IS NOT NULL ORDER BY y DESC")]
     args = request.args
-    adv = any(args.get(k) for k in ("q", "type", "cp", "stage", "from", "to", "amin", "amax"))
+    adv = any(args.get(k) for k in ("q", "type", "cp", "stage", "from", "to",
+                                    "amin", "amax", "owner", "year"))
     return render_template("registry.html", rows=rows, flt=flt, types=types, cps=cps,
+                           companies=companies, years=years,
                            args=args, adv=adv, total_amount=total_amount)
 
 
