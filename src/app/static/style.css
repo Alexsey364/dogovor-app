@@ -707,3 +707,19 @@ a.kpi:hover{box-shadow:0 2px 6px rgba(22,34,46,.08),0 10px 26px rgba(22,34,46,.1
 
 /* скрытая вкладка не должна показываться (перебивает display:flex) */
 .tabpanel[hidden]{display:none}
+
+/* ============================================================
+   ОТЧЁТЫ — графики
+   ============================================================ */
+.colchart{display:flex;align-items:flex-end;gap:10px;padding:18px;overflow-x:auto}
+.colc{flex:1 1 0;min-width:40px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.colc-v{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.colc-track{width:100%;max-width:46px;height:140px;display:flex;align-items:flex-end}
+.colc-bar{width:100%;min-height:3px;border-radius:6px 6px 0 0;
+  background:linear-gradient(180deg,var(--grad-b),var(--accent))}
+.colc-x{font-size:11px;color:var(--muted);font-family:"Consolas",monospace;white-space:nowrap}
+.colc:hover .colc-bar{filter:brightness(1.1)}
+.bars.money .bar{grid-template-columns:minmax(140px,1.3fr) 1fr 130px}
+.bars.money .bn{text-align:right}
+@media (max-width:600px){.bars.money .bar{grid-template-columns:110px 1fr 96px}.bars.money .bn{font-size:12px}}
+.export-row{display:flex;gap:10px;flex-wrap:wrap;padding:15px 18px 4px}

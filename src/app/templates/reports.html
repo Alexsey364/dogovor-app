@@ -1,25 +1,86 @@
 {% extends "base.html" %}
-{% block crumb %}Отчёты{% endblock %}
+{% block crumb %}Отчёты и аналитика{% endblock %}
 {% block body %}
-<div class="note">Отчёты выгружаются в Excel (.xlsx) — открываются в Excel, LibreOffice, Google Таблицах. Данные на момент выгрузки.</div>
+
+<div class="kpis">
+  <div class="kpi"><span class="badge b-acc">{{ ic('doc') }}</span>
+    <div><div class="v">{{ totals.n }}</div><div class="l">договоров всего</div></div></div>
+  <div class="kpi k-ok"><span class="badge b-ok">{{ ic('ruble') }}</span>
+    <div><div class="v mono" style="font-size:20px">{{ totals.total|money }}</div><div class="l">общая сумма</div></div></div>
+  <div class="kpi"><span class="badge b-info">{{ ic('chart') }}</span>
+    <div><div class="v mono" style="font-size:20px">{{ totals.avg_amount|money }}</div><div class="l">средний договор</div></div></div>
+  <div class="kpi k-warn"><span class="badge b-warn">{{ ic('alert') }}</span>
+    <div><div class="v">{{ totals.with_findings }}</div><div class="l">с замечаниями</div></div></div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Договоры по месяцам</h2><span class="muted" style="font-size:12.5px">за последние 12 мес. · по дате подписания</span></div>
+  {% if by_month %}
+  {% set mmax = (by_month|map(attribute='n')|max) %}
+  <div class="colchart">
+    {% for r in by_month %}
+    <div class="colc" title="{{ r.m }} · {{ r.n }} договоров · {{ r.total|money }}">
+      <div class="colc-v">{{ r.n }}</div>
+      <div class="colc-track"><div class="colc-bar" style="height:{{ (r.n/mmax*100)|round|int if mmax else 0 }}%"></div></div>
+      <div class="colc-x">{{ r.m }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}<div class="empty muted">Нет подписанных договоров за период.</div>{% endif %}
+</div>
 
 <div class="grid2">
   <div class="card">
-    <div class="card-h"><h2>Реестр договоров</h2></div>
-    <div class="legend">Все договоры: номер, дата, заказчик, тип, объект, сумма, аванс, гарантия, стадия, число замечаний.</div>
-    <div class="form-foot" style="border:none"><a class="btn" href="{{ url_for('export_registry') }}">Выгрузить в Excel</a></div>
+    <div class="card-h"><h2>Суммы по типам работ</h2></div>
+    {% set tmax = (by_type|map(attribute='total')|max) if by_type else 0 %}
+    <div class="bars money">
+      {% for r in by_type %}
+      <div class="bar">
+        <span class="bl">{{ r.name|truncate(26) }} <span class="muted">· {{ r.n }}</span></span>
+        <span class="track"><span class="fill" style="width:{{ (r.total/tmax*100)|round|int if tmax else 0 }}%;background:var(--accent)"></span></span>
+        <span class="bn mono">{{ r.total|money }}</span>
+      </div>
+      {% endfor %}
+    </div>
   </div>
-  {% if perm_level('payments') != 'none' %}
   <div class="card">
-    <div class="card-h"><h2>Платежи</h2></div>
-    <div class="legend">График платежей: плановая дата, договор, заказчик, тип, направление, сумма, отметка оплаты.</div>
-    <div class="form-foot" style="border:none"><a class="btn" href="{{ url_for('export_payments') }}">Выгрузить в Excel</a></div>
+    <div class="card-h"><h2>Топ заказчиков по сумме</h2></div>
+    {% set cmax = (by_cp|map(attribute='total')|max) if by_cp else 0 %}
+    <div class="bars money">
+      {% for r in by_cp %}
+      <div class="bar">
+        <span class="bl">{{ r.name|truncate(26) }} <span class="muted">· {{ r.n }}</span></span>
+        <span class="track"><span class="fill" style="width:{{ (r.total/cmax*100)|round|int if cmax else 0 }}%;background:var(--info)"></span></span>
+        <span class="bn mono">{{ r.total|money }}</span>
+      </div>
+      {% endfor %}
+    </div>
   </div>
-  {% endif %}
-  <div class="card">
-    <div class="card-h"><h2>Гарантийные обязательства</h2></div>
-    <div class="legend">Объекты на гарантии: срок, дата ввода, дата окончания гарантии, заказчик, объект.</div>
-    <div class="form-foot" style="border:none"><a class="btn" href="{{ url_for('export_warranty') }}">Выгрузить в Excel</a></div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Портфель по стадиям</h2><a class="link" href="{{ url_for('board') }}">на доску →</a></div>
+  {% set smax = (by_stage.values()|max) if by_stage else 1 %}
+  <div class="bars">
+    {% for s in STAGE_ORDER %}
+      {% if by_stage.get(s) %}
+      <div class="bar">
+        <span class="bl">{{ STAGE_RU[s] }}</span>
+        <span class="track"><span class="fill stage-{{ s }}" style="width:{{ (by_stage.get(s)/smax*100)|round|int }}%"></span></span>
+        <span class="bn">{{ by_stage.get(s) }}</span>
+      </div>
+      {% endif %}
+    {% endfor %}
   </div>
+</div>
+
+<div class="card">
+  <div class="card-h"><h2>Выгрузка в Excel</h2></div>
+  <div class="export-row">
+    <a class="btn-ghost" href="{{ url_for('export_registry') }}">Реестр договоров</a>
+    {% if perm_level('payments') != 'none' %}<a class="btn-ghost" href="{{ url_for('export_payments') }}">Платежи</a>{% endif %}
+    <a class="btn-ghost" href="{{ url_for('export_warranty') }}">Гарантии</a>
+  </div>
+  <div class="legend">Файлы .xlsx открываются в Excel, LibreOffice, Google Таблицах. Данные — на момент выгрузки.</div>
 </div>
 {% endblock %}

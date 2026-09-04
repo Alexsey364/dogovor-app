@@ -1635,7 +1635,36 @@ XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 def reports():
     if not can("reports"):
         abort(403)
-    return render_template("reports.html")
+    by_month = db.query("""
+        SELECT to_char(date_trunc('month', signed_on), 'MM.YY') AS m,
+               count(*) AS n, coalesce(sum(amount),0) AS total
+        FROM contracts
+        WHERE signed_on IS NOT NULL
+          AND signed_on >= (date_trunc('month', current_date) - interval '11 months')::date
+        GROUP BY date_trunc('month', signed_on)
+        ORDER BY date_trunc('month', signed_on)
+    """)
+    by_type = db.query("""
+        SELECT coalesce(ct.name,'—') AS name, count(*) AS n, coalesce(sum(c.amount),0) AS total
+        FROM contracts c LEFT JOIN contract_types ct ON ct.code=c.type_code
+        GROUP BY ct.name ORDER BY sum(c.amount) DESC NULLS LAST
+    """)
+    by_cp = db.query("""
+        SELECT coalesce(cp.name,'—') AS name, count(*) AS n, coalesce(sum(c.amount),0) AS total
+        FROM contracts c LEFT JOIN counterparties cp ON cp.id=c.counterparty_id
+        GROUP BY cp.name ORDER BY sum(c.amount) DESC NULLS LAST LIMIT 8
+    """)
+    by_stage = {r["stage"]: r["n"] for r in db.query(
+        "SELECT stage, count(*) AS n FROM contracts GROUP BY stage")}
+    totals = db.query_one("""
+        SELECT count(*) AS n, coalesce(sum(amount),0) AS total,
+          coalesce(avg(amount),0) AS avg_amount,
+          count(*) FILTER (WHERE EXISTS (SELECT 1 FROM review_findings rf
+             WHERE rf.contract_id=contracts.id AND rf.resolution IS NULL)) AS with_findings
+        FROM contracts
+    """) or {}
+    return render_template("reports.html", by_month=by_month, by_type=by_type,
+                           by_cp=by_cp, by_stage=by_stage, totals=totals)
 
 
 @app.route("/export/registry.xlsx")
