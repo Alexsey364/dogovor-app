@@ -11,6 +11,16 @@
   {% if can('create_contract') %}<a class="btn" href="{{ url_for('contract_new') }}">+ Новый договор</a>{% endif %}
 </div>
 
+{% if substituting %}
+{% for s in substituting %}
+<div class="remind" style="border-color:var(--violet);background:color-mix(in srgb,var(--violet) 10%,transparent)">
+  <span class="rk">🔁 Вы замещаете: {{ s.full_name }}</span>
+  <span>отсутствует до {{ s.absent_to|dt('%d.%m.%Y') }}{% if s.open_tasks %} · {{ s.open_tasks }} его задач в работе{% endif %}</span>
+  <a href="{{ url_for('tasks_page', f='all') }}">Открыть задачи →</a>
+</div>
+{% endfor %}
+{% endif %}
+
 {% if nav and nav.deadlines %}
 <div class="remind">
   <span class="rk">⏰ Сроки:</span>

@@ -344,8 +344,15 @@ def index():
     """)
     by_stage = {r["stage"]: r["n"] for r in db.query(
         "SELECT stage, count(*) AS n FROM contracts GROUP BY stage")}
+    substituting = db.query("""
+        SELECT u.full_name, u.absent_to,
+               (SELECT count(*) FROM tasks t WHERE t.assignee_id=u.id AND t.is_done=false) AS open_tasks
+        FROM users u
+        WHERE u.substitute_id=%s AND u.absent_from IS NOT NULL AND u.absent_to IS NOT NULL
+          AND current_date BETWEEN u.absent_from AND u.absent_to
+    """, (g.user["id"],))
     return render_template("dashboard.html", stats=stats, sev=sev,
-                           critical=critical, warns=warns,
+                           critical=critical, warns=warns, substituting=substituting,
                            by_stage=by_stage, stage_order=STAGE_ORDER)
 
 
@@ -963,9 +970,13 @@ def warranty():
 def users():
     rows = db.query("""
         SELECT u.id, u.login, u.full_name, u.role_code, r.name AS role_name,
-               d.name AS dept, u.is_active, u.last_login_at
+               d.name AS dept, u.is_active, u.last_login_at,
+               u.absent_from, u.absent_to, s.full_name AS substitute,
+               (u.absent_from IS NOT NULL AND u.absent_to IS NOT NULL
+                AND current_date BETWEEN u.absent_from AND u.absent_to) AS absent_now
         FROM users u JOIN roles r ON r.code=u.role_code
         LEFT JOIN departments d ON d.id=u.department_id
+        LEFT JOIN users s ON s.id=u.substitute_id
         ORDER BY u.id
     """)
     return render_template("users.html", rows=rows)
@@ -1139,6 +1150,8 @@ def user_edit(uid):
         abort(404)
     depts = db.query("SELECT id, name FROM departments ORDER BY name")
     roles = db.query("SELECT code, name FROM roles ORDER BY name")
+    others = db.query("SELECT id, full_name FROM users WHERE id<>%s AND is_active "
+                      "ORDER BY full_name", (uid,))
     if request.method == "POST":
         action = request.form.get("action")
         if action == "reset_password":
@@ -1162,14 +1175,18 @@ def user_edit(uid):
             if uid == g.user["id"] and (role != "admin" or not is_active):
                 flash("Нельзя снять права администратора или отключить самого себя")
             else:
+                sub = request.form.get("substitute_id") or None
+                a_from = request.form.get("absent_from") or None
+                a_to = request.form.get("absent_to") or None
                 db.execute(
                     "UPDATE users SET full_name=%s, login=%s, role_code=%s, department_id=%s, "
-                    "is_active=%s WHERE id=%s",
-                    (full_name, login_name, role, dept or None, is_active, uid))
+                    "is_active=%s, substitute_id=%s, absent_from=%s, absent_to=%s WHERE id=%s",
+                    (full_name, login_name, role, dept or None, is_active,
+                     sub, a_from, a_to, uid))
                 audit("user_edit", "user", uid, after={"login": login_name, "role": role})
                 flash("Пользователь сохранён")
                 return redirect(url_for("users"))
-    return render_template("user_edit.html", u=u, depts=depts, roles=roles)
+    return render_template("user_edit.html", u=u, depts=depts, roles=roles, others=others)
 
 
 @app.route("/build", methods=["GET", "POST"])

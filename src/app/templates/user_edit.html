@@ -17,6 +17,15 @@
       </select>
     </label>
     <label class="check"><input type="checkbox" name="is_active" {{ 'checked' if u.is_active }}> Учётная запись активна</label>
+    <div class="form-sep">Замещение (отпуск / больничный)</div>
+    <label>Заместитель
+      <select name="substitute_id"><option value="">— нет —</option>
+        {% for o in others %}<option value="{{ o.id }}" {{ 'selected' if o.id==u.substitute_id }}>{{ o.full_name }}</option>{% endfor %}
+      </select>
+      <span class="hint">На время отсутствия его задачи ведёт заместитель</span>
+    </label>
+    <label>Отсутствует с<input type="date" name="absent_from" value="{{ u.absent_from|dt('%Y-%m-%d') if u.absent_from else '' }}"></label>
+    <label>по<input type="date" name="absent_to" value="{{ u.absent_to|dt('%Y-%m-%d') if u.absent_to else '' }}"></label>
     <div class="form-foot">
       <button class="btn" type="submit">Сохранить</button>
       <a class="btn-ghost" href="{{ url_for('users') }}">Отмена</a>

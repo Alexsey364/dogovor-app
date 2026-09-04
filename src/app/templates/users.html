@@ -10,10 +10,11 @@
     <tbody>
       {% for r in rows %}
       <tr onclick="location='{{ url_for('user_edit', uid=r.id) }}'" style="cursor:pointer">
-        <td>{{ r.full_name }}</td>
+        <td>{{ r.full_name }}
+          {% if r.absent_now %}<span class="pill warn" title="Замещает: {{ r.substitute or '—' }}">в отпуске до {{ r.absent_to|dt('%d.%m') }}</span>{% endif %}</td>
         <td class="mono">{{ r.login }}</td>
         <td><span class="pill role-{{ r.role_code }}">{{ r.role_name }}</span></td>
-        <td class="muted">{{ r.dept or '—' }}</td>
+        <td class="muted">{{ r.dept or '—' }}{% if r.substitute %} · замещ.: {{ r.substitute }}{% endif %}</td>
         <td class="mono">{{ r.last_login_at|dt('%d.%m.%y %H:%M') if r.last_login_at else '—' }}</td>
         <td>{% if r.is_active %}<span class="pill ok">активен</span>{% else %}<span class="pill">отключён</span>{% endif %}</td>
       </tr>
