@@ -18,8 +18,8 @@
 
 <div class="board" id="board" data-canmove="{{ '1' if can_move else '0' }}">
   {% for s in stage_order %}
-  <div class="col" data-stage="{{ s }}">
-    <div class="col-h"><span class="t">{{ STAGE_RU[s] }}</span><span class="c" data-count="{{ s }}">{{ cols[s]|length }}</span></div>
+  <div class="col stage-{{ s }}" data-stage="{{ s }}">
+    <div class="col-h"><span class="t"><span class="dotstage"></span>{{ STAGE_RU[s] }}</span><span class="c" data-count="{{ s }}">{{ cols[s]|length }}</span></div>
     {% for r in cols[s] %}
     <a class="tk stage-{{ s }}" href="{{ url_for('contract', cid=r.id) }}"
        {% if can_move %}draggable="true" data-cid="{{ r.id }}" data-move="{{ url_for('contract_move', cid=r.id) }}"{% endif %}>
