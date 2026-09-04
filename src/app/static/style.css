@@ -741,3 +741,10 @@ a.kpi:hover{box-shadow:0 2px 6px rgba(22,34,46,.08),0 10px 26px rgba(22,34,46,.1
 .tk-owner.owner-ooo{background:var(--info-soft);color:var(--info)}
 .tk.owner-ip{border-right:3px solid var(--violet)}
 .tk.owner-ooo{border-right:3px solid var(--info)}
+
+/* метка ИП/ООО в правом нижнем углу карточки + подкраска фона */
+.tk .meta-r{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.tk.owner-ip{background:color-mix(in srgb,var(--violet) 7%,var(--surface))}
+.tk.owner-ooo{background:color-mix(in srgb,var(--info) 7%,var(--surface))}
+.tk.owner-ip:hover{background:color-mix(in srgb,var(--violet) 12%,var(--surface))}
+.tk.owner-ooo:hover{background:color-mix(in srgb,var(--info) 12%,var(--surface))}
