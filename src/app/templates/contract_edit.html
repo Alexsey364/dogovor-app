@@ -4,6 +4,17 @@
 <div class="card">
   <div class="card-h"><h2>Редактирование {{ c.number_text }}</h2></div>
   <form method="post" class="form">
+    <label>Наша компания
+      <select name="owner_company_id">
+        <option value="">— не указана —</option>
+        {% for oc in companies %}<option value="{{ oc.id }}"{{ ' selected' if c.owner_company_id==oc.id }}>{{ oc.short_name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Вид работ
+      <select name="type_code">
+        {% for t in types %}<option value="{{ t.code }}"{{ ' selected' if c.type_code==t.code }}>{{ t.name }}</option>{% endfor %}
+      </select>
+    </label>
     <label class="wide">Предмет договора<input name="subject" value="{{ c.subject or '' }}" required></label>
     <label>Сумма, ₽<input name="amount" type="number" step="0.01" value="{{ c.amount or '' }}"></label>
     <label>Аванс, %<input name="advance_pct" type="number" step="1" min="0" max="100" value="{{ (c.advance_pct|round|int) if c.advance_pct else '' }}"></label>

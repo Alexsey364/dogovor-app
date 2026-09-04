@@ -1159,13 +1159,16 @@ def contract_new():
         abort(403)
     types = db.query("SELECT code, name, default_advance_pct, warranty_months FROM contract_types ORDER BY name")
     cps = db.query("SELECT id, name FROM counterparties ORDER BY name")
+    companies = db.query("SELECT id, short_name FROM owner_companies WHERE is_active ORDER BY ord")
     if request.method == "POST":
         type_code = request.form.get("type_code")
+        owner = request.form.get("owner_company_id") or None
         cp_id = request.form.get("counterparty_id") or None
         cp_new = (request.form.get("counterparty_new") or "").strip()
         cp_kind = request.form.get("cp_kind") or "commercial"
         address = (request.form.get("address") or "").strip()
         subject = (request.form.get("subject") or "").strip()
+        signed_on = request.form.get("signed_on") or None
         amount = request.form.get("amount") or None
         advance_pct = request.form.get("advance_pct") or None
         warranty = request.form.get("warranty_months") or None
@@ -1188,17 +1191,19 @@ def contract_new():
                 advance_amount = round(float(amount) * float(advance_pct) / 100, 2)
             num = next_number()
             cid = db.query_one("""
-                INSERT INTO contracts(number_text, type_code, counterparty_id, object_id,
-                    subject, amount, advance_pct, advance_amount, warranty_months,
-                    has_penalty, stage, created_by)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'draft',%s) RETURNING id""",
-                (num, type_code, cp_id, obj_id, subject, amount or None, advance_pct or None,
-                 advance_amount, warranty or None, has_penalty, g.user["id"]))["id"]
+                INSERT INTO contracts(number_text, type_code, owner_company_id,
+                    counterparty_id, object_id, subject, signed_on, amount, advance_pct,
+                    advance_amount, warranty_months, has_penalty, stage, created_by)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'draft',%s) RETURNING id""",
+                (num, type_code, owner, cp_id, obj_id, subject, signed_on, amount or None,
+                 advance_pct or None, advance_amount, warranty or None, has_penalty,
+                 g.user["id"]))["id"]
             n = review_engine.run(cid)
             audit("create", "contract", cid, after={"number": num})
             flash(f"Договор {num} создан. Проверка нашла замечаний: {n}")
             return redirect(url_for("contract", cid=cid))
-    return render_template("contract_new.html", types=types, cps=cps, next_num=next_number())
+    return render_template("contract_new.html", types=types, cps=cps,
+                           companies=companies, next_num=next_number())
 
 
 @app.route("/contract/<int:cid>/review", methods=["POST"])
@@ -1302,22 +1307,25 @@ def contract_edit(cid):
     if not c:
         abort(404)
     types = db.query("SELECT code, name FROM contract_types ORDER BY name")
+    companies = db.query("SELECT id, short_name FROM owner_companies WHERE is_active ORDER BY ord")
     if request.method == "POST":
         f = request.form
         amount = f.get("amount") or None
         adv = f.get("advance_pct") or None
         advance_amount = round(float(amount) * float(adv) / 100, 2) if (amount and adv) else None
         db.execute("""
-            UPDATE contracts SET subject=%s, amount=%s, advance_pct=%s, advance_amount=%s,
+            UPDATE contracts SET subject=%s, type_code=%s, owner_company_id=%s,
+                amount=%s, advance_pct=%s, advance_amount=%s,
                 warranty_months=%s, commissioning_date=%s, signed_on=%s,
                 has_penalty=%s, updated_at=now() WHERE id=%s""",
-            (f.get("subject"), amount, adv, advance_amount,
+            (f.get("subject"), f.get("type_code") or c["type_code"],
+             f.get("owner_company_id") or None, amount, adv, advance_amount,
              f.get("warranty_months") or None, f.get("commissioning_date") or None,
              f.get("signed_on") or None, f.get("has_penalty") == "on", cid))
         audit("edit", "contract", cid)
         flash("Договор сохранён")
         return redirect(url_for("contract", cid=cid))
-    return render_template("contract_edit.html", c=c, types=types)
+    return render_template("contract_edit.html", c=c, types=types, companies=companies)
 
 
 @app.route("/contract/<int:cid>/execution", methods=["POST"])
